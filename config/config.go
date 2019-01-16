@@ -32,6 +32,7 @@ type WaveFrontConfig struct {
 	ProxyPort     int    `envconfig:"PROXY_PORT"`
 	FlushInterval int    `required:"true" envconfig:"FLUSH_INTERVAL"`
 	Prefix        string `required:"true" envconfig:"PREFIX"`
+	Foundation    string `required:"true" envconfig:"FOUNDATION"`
 }
 
 var defaultEvents = []events.Envelope_EventType{

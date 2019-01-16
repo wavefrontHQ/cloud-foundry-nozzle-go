@@ -12,9 +12,10 @@ import (
 )
 
 type WavefrontEventHandler struct {
-	sender senders.Sender
-	logger *log.Logger
-	prefix string
+	sender     senders.Sender
+	logger     *log.Logger
+	prefix     string
+	foundation string
 }
 
 func CreateWavefrontEventHandler(conf *config.WaveFrontConfig) *WavefrontEventHandler {
@@ -48,7 +49,7 @@ func CreateWavefrontEventHandler(conf *config.WaveFrontConfig) *WavefrontEventHa
 		logger.Fatal(errors.New("One of NOZZLE_WF_URL or NOZZLE_WF_PROXY are required"))
 	}
 
-	return &WavefrontEventHandler{sender: sender, logger: logger, prefix: conf.Prefix}
+	return &WavefrontEventHandler{sender: sender, logger: logger, prefix: conf.Prefix, foundation: conf.Foundation}
 }
 
 func (w *WavefrontEventHandler) BuildHttpStartStopEvent(event *events.Envelope) {
@@ -66,20 +67,20 @@ func (w *WavefrontEventHandler) BuildValueMetricEvent(event *events.Envelope) {
 	metricName += "." + event.GetOrigin()
 	metricName += "." + event.GetValueMetric().GetName()
 	metricName += "." + event.GetValueMetric().GetUnit()
-	source, tags, ts := getMetricInfo(event)
+	source, tags, ts := w.getMetricInfo(event)
 
 	value := event.GetValueMetric().GetValue()
 
 	w.sender.SendMetric(metricName, value, ts, source, tags)
 
-	// genericSerializer(event)
+	w.genericSerializer(event)
 }
 
 func (w *WavefrontEventHandler) BuildCounterEvent(event *events.Envelope) {
 	metricName := w.prefix
 	metricName += "." + event.GetOrigin()
 	metricName += "." + event.GetCounterEvent().GetName()
-	source, tags, ts := getMetricInfo(event)
+	source, tags, ts := w.getMetricInfo(event)
 
 	total := event.GetCounterEvent().GetTotal()
 	delta := event.GetCounterEvent().GetDelta()
@@ -94,7 +95,7 @@ func (w *WavefrontEventHandler) BuildErrorEvent(event *events.Envelope) {
 
 func (w *WavefrontEventHandler) BuildContainerEvent(event *events.Envelope, appInfo *api.AppInfo) {
 	metricName := w.prefix + ".container." + event.GetOrigin()
-	source, tags, ts := getMetricInfo(event)
+	source, tags, ts := w.getMetricInfo(event)
 
 	tags["applicationId"] = event.GetContainerMetric().GetApplicationId()
 	tags["instanceIndex"] = string(event.GetContainerMetric().GetInstanceIndex())
@@ -119,14 +120,14 @@ func (w *WavefrontEventHandler) genericSerializer(event *events.Envelope) {
 	w.logger.Printf("Event: %v", event)
 }
 
-func getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
-	source := getSource(event)
-	tags := getTags(event)
+func (w *WavefrontEventHandler) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
+	source := w.getSource(event)
+	tags := w.getTags(event)
 
 	return source, tags, event.GetTimestamp()
 }
 
-func getSource(event *events.Envelope) string {
+func (w *WavefrontEventHandler) getSource(event *events.Envelope) string {
 	source := event.GetIp()
 	if len(source) == 0 {
 		source = event.GetJob()
@@ -142,7 +143,7 @@ func getSource(event *events.Envelope) string {
 	return source
 }
 
-func getTags(event *events.Envelope) map[string]string {
+func (w *WavefrontEventHandler) getTags(event *events.Envelope) map[string]string {
 	tags := make(map[string]string)
 
 	if deployment := event.GetDeployment(); len(deployment) > 0 {
@@ -153,8 +154,7 @@ func getTags(event *events.Envelope) map[string]string {
 		tags["job"] = job
 	}
 
-	// TODO: fundation tags
-	tags["foundation"] = "foundation"
+	tags["foundation"] = w.foundation
 
 	for k, v := range event.GetTags() {
 		tags[k] = v
