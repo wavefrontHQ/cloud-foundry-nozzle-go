@@ -1,4 +1,4 @@
-package wavefrontnozzle
+package nozzle
 
 import (
 	"errors"
@@ -6,19 +6,28 @@ import (
 	"os"
 
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/api"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/config"
 	"github.com/wavefronthq/wavefront-sdk-go/senders"
 )
 
-type WavefrontEventHandler struct {
+// EventHandler receive CF events and send metrics to WF
+type EventHandler interface {
+	BuildHTTPStartStopEvent(event *events.Envelope)
+	BuildLogMessageEvent(event *events.Envelope)
+	BuildValueMetricEvent(event *events.Envelope)
+	BuildCounterEvent(event *events.Envelope)
+	BuildErrorEvent(event *events.Envelope)
+	BuildContainerEvent(event *events.Envelope, appInfo *AppInfo)
+}
+
+type eventHandlerImpl struct {
 	sender     senders.Sender
 	logger     *log.Logger
 	prefix     string
 	foundation string
 }
 
-func CreateWavefrontEventHandler(conf *config.WaveFrontConfig) *WavefrontEventHandler {
+// CreateEventHandler create a new EventHandler
+func CreateEventHandler(conf *WaveFrontConfig) EventHandler {
 	var sender senders.Sender
 	var err error
 	logger := log.New(os.Stdout, ">>> ", 0)
@@ -49,18 +58,18 @@ func CreateWavefrontEventHandler(conf *config.WaveFrontConfig) *WavefrontEventHa
 		logger.Fatal(errors.New("One of NOZZLE_WF_URL or NOZZLE_WF_PROXY are required"))
 	}
 
-	return &WavefrontEventHandler{sender: sender, logger: logger, prefix: conf.Prefix, foundation: conf.Foundation}
+	return &eventHandlerImpl{sender: sender, logger: logger, prefix: conf.Prefix, foundation: conf.Foundation}
 }
 
-func (w *WavefrontEventHandler) BuildHttpStartStopEvent(event *events.Envelope) {
+func (w *eventHandlerImpl) BuildHTTPStartStopEvent(event *events.Envelope) {
 	// genericSerializer(event)
 }
 
-func (w *WavefrontEventHandler) BuildLogMessageEvent(event *events.Envelope) {
+func (w *eventHandlerImpl) BuildLogMessageEvent(event *events.Envelope) {
 	// genericSerializer(event)
 }
 
-func (w *WavefrontEventHandler) BuildValueMetricEvent(event *events.Envelope) {
+func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
 	// >>> Events: origin:"DopplerServer" eventType:ValueMetric timestamp:1544661565385165422 deployment:"cf" job:"doppler" index:"3eba5e5c-069c-4f06-a3d6-ca7faa8df2db" ip:"10.202.6.14" valueMetric:<name:"grpcManager.subscriptions" value:2 unit:"subscriptions" >
 	// MetricName: "<origin>.<name>.<unit>"
 	metricName := w.prefix
@@ -73,10 +82,10 @@ func (w *WavefrontEventHandler) BuildValueMetricEvent(event *events.Envelope) {
 
 	w.sender.SendMetric(metricName, value, ts, source, tags)
 
-	w.genericSerializer(event)
+	//w.genericSerializer(event)
 }
 
-func (w *WavefrontEventHandler) BuildCounterEvent(event *events.Envelope) {
+func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
 	metricName := w.prefix
 	metricName += "." + event.GetOrigin()
 	metricName += "." + event.GetCounterEvent().GetName()
@@ -89,11 +98,11 @@ func (w *WavefrontEventHandler) BuildCounterEvent(event *events.Envelope) {
 	w.sender.SendMetric(metricName+".delta", float64(delta), ts, source, tags)
 }
 
-func (w *WavefrontEventHandler) BuildErrorEvent(event *events.Envelope) {
+func (w *eventHandlerImpl) BuildErrorEvent(event *events.Envelope) {
 	// genericSerializer(event)
 }
 
-func (w *WavefrontEventHandler) BuildContainerEvent(event *events.Envelope, appInfo *api.AppInfo) {
+func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *AppInfo) {
 	metricName := w.prefix + ".container." + event.GetOrigin()
 	source, tags, ts := w.getMetricInfo(event)
 
@@ -116,18 +125,18 @@ func (w *WavefrontEventHandler) BuildContainerEvent(event *events.Envelope, appI
 	w.sender.SendMetric(metricName+".memory_bytes_quota", float64(memoryBytesQuota), ts, source, tags)
 }
 
-func (w *WavefrontEventHandler) genericSerializer(event *events.Envelope) {
+func (w *eventHandlerImpl) genericSerializer(event *events.Envelope) {
 	w.logger.Printf("Event: %v", event)
 }
 
-func (w *WavefrontEventHandler) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
+func (w *eventHandlerImpl) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
 	source := w.getSource(event)
 	tags := w.getTags(event)
 
 	return source, tags, event.GetTimestamp()
 }
 
-func (w *WavefrontEventHandler) getSource(event *events.Envelope) string {
+func (w *eventHandlerImpl) getSource(event *events.Envelope) string {
 	source := event.GetIp()
 	if len(source) == 0 {
 		source = event.GetJob()
@@ -143,7 +152,7 @@ func (w *WavefrontEventHandler) getSource(event *events.Envelope) string {
 	return source
 }
 
-func (w *WavefrontEventHandler) getTags(event *events.Envelope) map[string]string {
+func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
 	tags := make(map[string]string)
 
 	if deployment := event.GetDeployment(); len(deployment) > 0 {

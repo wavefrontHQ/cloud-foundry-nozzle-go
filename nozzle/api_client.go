@@ -1,23 +1,26 @@
-package api
+package nozzle
 
 import (
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
 )
 
-type ApiClient struct {
+// APIClient wrapper for Cloud Foundry Client
+type APIClient struct {
 	clientConfig *cfclient.Config
 	client       *cfclient.Client
 }
 
+// AppInfo holds Cloud Foundry applications information
 type AppInfo struct {
 	Name  string
 	Space string
 	Org   string
 }
 
-func NewAPIClient(apiUrl string, username string, password string, sslSkipVerify bool) (*ApiClient, error) {
+// NewAPIClient crate a new ApiClient
+func NewAPIClient(apiURL string, username string, password string, sslSkipVerify bool) (*APIClient, error) {
 	config := &cfclient.Config{
-		ApiAddress:        apiUrl,
+		ApiAddress:        apiURL,
 		Username:          username,
 		Password:          password,
 		SkipSslValidation: sslSkipVerify,
@@ -28,17 +31,19 @@ func NewAPIClient(apiUrl string, username string, password string, sslSkipVerify
 		return nil, err
 	}
 
-	return &ApiClient{
+	return &APIClient{
 		clientConfig: config,
 		client:       client,
 	}, nil
 }
 
-func (api *ApiClient) FetchTrafficControllerURL() string {
+// FetchTrafficControllerURL return Doppler Endpoint URL
+func (api *APIClient) FetchTrafficControllerURL() string {
 	return api.client.Endpoint.DopplerEndpoint
 }
 
-func (api *ApiClient) FetchAuthToken() (string, error) {
+// FetchAuthToken wrapper for client.GetToken()
+func (api *APIClient) FetchAuthToken() (string, error) {
 	token, err := api.client.GetToken()
 	if err != nil {
 		return "", err
@@ -46,7 +51,8 @@ func (api *ApiClient) FetchAuthToken() (string, error) {
 	return token, nil
 }
 
-func (api *ApiClient) ListApps() map[string]*AppInfo {
+// ListApps wrapper for client.ListApps()
+func (api *APIClient) ListApps() map[string]*AppInfo {
 	appsInfo := make(map[string]*AppInfo)
 	apps, _ := api.client.ListApps()
 	for _, app := range apps {

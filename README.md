@@ -27,6 +27,8 @@ applications:
     health-check-type: process
     buildpack: https://github.com/cloudfoundry/go-buildpack.git
     env:
+      GOPACKAGENAME: github.com/wavefronthq/cloud-foundry-nozzle-go
+      
       NOZZLE_API_URL: https://api.......
       NOZZLE_USERNAME: admin
       NOZZLE_PASSWORD: ......

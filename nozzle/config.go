@@ -1,7 +1,6 @@
-package config
+package nozzle
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,11 +9,13 @@ import (
 	"github.com/kelseyhightower/envconfig"
 )
 
+// Config holds users provided env variables
 type Config struct {
 	Nozzel    *NozzelConfig
 	WaveFront *WaveFrontConfig
 }
 
+// NozzelConfig holds specific PCF env variables
 type NozzelConfig struct {
 	APIURL                 string `required:"true" envconfig:"api_url"`
 	Username               string `required:"true"`
@@ -25,6 +26,7 @@ type NozzelConfig struct {
 	SelectedEvents []events.Envelope_EventType `ignored:"true"`
 }
 
+// WaveFrontConfig holds specific Wavefront env variables
 type WaveFrontConfig struct {
 	URL           string `envconfig:"URL"`
 	Token         string `envconfig:"API_TOKEN"`
@@ -40,7 +42,8 @@ var defaultEvents = []events.Envelope_EventType{
 	events.Envelope_CounterEvent,
 }
 
-func Parse() (*Config, error) {
+// ParseConfig reads users provided env variables and create a Config
+func ParseConfig() (*Config, error) {
 	nozzelConfig := &NozzelConfig{}
 	err := envconfig.Process("nozzle", nozzelConfig)
 	if err != nil {
@@ -67,18 +70,18 @@ func parseSelectedEvents() ([]events.Envelope_EventType, error) {
 	envValue := os.Getenv("NOZZLE_SELECTED_EVENTS")
 	if envValue == "" {
 		return defaultEvents, nil
-	} else {
-		selectedEvents := []events.Envelope_EventType{}
-
-		for _, envValueSplit := range strings.Split(envValue, ",") {
-			envValueSlitTrimmed := strings.TrimSpace(envValueSplit)
-			val, found := events.Envelope_EventType_value[envValueSlitTrimmed]
-			if found {
-				selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
-			} else {
-				return nil, errors.New(fmt.Sprintf("[%s] is not a valid event type", envValueSlitTrimmed))
-			}
-		}
-		return selectedEvents, nil
 	}
+
+	selectedEvents := []events.Envelope_EventType{}
+	for _, envValueSplit := range strings.Split(envValue, ",") {
+		envValueSlitTrimmed := strings.TrimSpace(envValueSplit)
+		val, found := events.Envelope_EventType_value[envValueSlitTrimmed]
+		if found {
+			selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
+		} else {
+			return nil, fmt.Errorf("[%s] is not a valid event type", envValueSlitTrimmed)
+		}
+	}
+
+	return selectedEvents, nil
 }
