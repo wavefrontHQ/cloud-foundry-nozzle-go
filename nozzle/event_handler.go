@@ -24,6 +24,8 @@ type eventHandlerImpl struct {
 	logger     *log.Logger
 	prefix     string
 	foundation string
+	filter     Filter
+	debug      bool
 }
 
 // CreateEventHandler create a new EventHandler
@@ -58,7 +60,14 @@ func CreateEventHandler(conf *WaveFrontConfig) EventHandler {
 		logger.Fatal(errors.New("One of NOZZLE_WF_URL or NOZZLE_WF_PROXY are required"))
 	}
 
-	return &eventHandlerImpl{sender: sender, logger: logger, prefix: conf.Prefix, foundation: conf.Foundation}
+	return &eventHandlerImpl{
+		sender:     sender,
+		logger:     logger,
+		prefix:     conf.Prefix,
+		foundation: conf.Foundation,
+		debug:      conf.Debug,
+		filter:     NewGlobFilter(conf.Filters),
+	}
 }
 
 func (w *eventHandlerImpl) BuildHTTPStartStopEvent(event *events.Envelope) {
@@ -80,9 +89,9 @@ func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
 
 	value := event.GetValueMetric().GetValue()
 
-	w.sender.SendMetric(metricName, value, ts, source, tags)
+	w.sendMetric(metricName, value, ts, source, tags)
 
-	//w.genericSerializer(event)
+	w.genericSerializer(event)
 }
 
 func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
@@ -94,8 +103,8 @@ func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
 	total := event.GetCounterEvent().GetTotal()
 	delta := event.GetCounterEvent().GetDelta()
 
-	w.sender.SendMetric(metricName+".total", float64(total), ts, source, tags)
-	w.sender.SendMetric(metricName+".delta", float64(delta), ts, source, tags)
+	w.sendMetric(metricName+".total", float64(total), ts, source, tags)
+	w.sendMetric(metricName+".delta", float64(delta), ts, source, tags)
 }
 
 func (w *eventHandlerImpl) BuildErrorEvent(event *events.Envelope) {
@@ -118,15 +127,15 @@ func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *
 	memoryBytes := event.GetContainerMetric().GetMemoryBytes()
 	memoryBytesQuota := event.GetContainerMetric().GetMemoryBytesQuota()
 
-	w.sender.SendMetric(metricName+".cpu_percentage", cpuPercentage, ts, source, tags)
-	w.sender.SendMetric(metricName+".disk_bytes", float64(diskBytes), ts, source, tags)
-	w.sender.SendMetric(metricName+".disk_bytes_quota", float64(diskBytesQuota), ts, source, tags)
-	w.sender.SendMetric(metricName+".memory_bytes", float64(memoryBytes), ts, source, tags)
-	w.sender.SendMetric(metricName+".memory_bytes_quota", float64(memoryBytesQuota), ts, source, tags)
+	w.sendMetric(metricName+".cpu_percentage", cpuPercentage, ts, source, tags)
+	w.sendMetric(metricName+".disk_bytes", float64(diskBytes), ts, source, tags)
+	w.sendMetric(metricName+".disk_bytes_quota", float64(diskBytesQuota), ts, source, tags)
+	w.sendMetric(metricName+".memory_bytes", float64(memoryBytes), ts, source, tags)
+	w.sendMetric(metricName+".memory_bytes_quota", float64(memoryBytesQuota), ts, source, tags)
 }
 
 func (w *eventHandlerImpl) genericSerializer(event *events.Envelope) {
-	w.logger.Printf("Event: %v", event)
+	// w.logger.Printf("Event: %v", event)
 }
 
 func (w *eventHandlerImpl) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
@@ -170,4 +179,21 @@ func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
 	}
 
 	return tags
+}
+
+func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
+	if w.debug {
+		line, err := senders.MetricLine(name, value, ts, source, tags, "")
+		if err != nil {
+			log.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
+		}
+		log.Printf("[DEBUG] metric: %s", line)
+	}
+
+	if w.filter.Match(name, tags) {
+		err := w.sender.SendMetric(name, value, ts, source, tags)
+		if err != nil {
+			log.Printf("[ERROR] error sending the metric '%s': %v", name, err)
+		}
+	}
 }

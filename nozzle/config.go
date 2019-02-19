@@ -3,6 +3,7 @@ package nozzle
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/cloudfoundry/sonde-go/events"
@@ -35,6 +36,35 @@ type WaveFrontConfig struct {
 	FlushInterval int    `required:"true" envconfig:"FLUSH_INTERVAL"`
 	Prefix        string `required:"true" envconfig:"PREFIX"`
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
+	Debug         bool
+
+	Filters *FiltersConfig `ignored:"true"`
+}
+
+type TagFilter map[string][]string
+
+func (f *TagFilter) Decode(filters string) error {
+	r := regexp.MustCompile(`:\w`)
+	if r.MatchString(filters) {
+		return fmt.Errorf("bad format... 'tagName:[regex]' or 'tagName:[regex, regex1, ... regexX]'")
+	}
+
+	r = regexp.MustCompile(`(\w*):\[([^\]]*)\]`)
+	(*f) = make(map[string][]string)
+	matches := r.FindAllStringSubmatch(filters, -1) // matches is [][]string
+	for _, match := range matches {
+		(*f)[match[1]] = strings.Split(match[2], ",")
+	}
+	return nil
+}
+
+//FiltersConfig holds metrics white and black list filters
+type FiltersConfig struct {
+	MetricsBlackList []string `split_words:"true"`
+	MetricsWhiteList []string `split_words:"true"`
+
+	MetricsTagBlackList TagFilter `split_words:"true"`
+	MetricsTagWhiteList TagFilter `split_words:"true"`
 }
 
 var defaultEvents = []events.Envelope_EventType{
@@ -44,6 +74,11 @@ var defaultEvents = []events.Envelope_EventType{
 
 // ParseConfig reads users provided env variables and create a Config
 func ParseConfig() (*Config, error) {
+	parseIndexedVars("FILTER_METRICS_BLACK_LIST")
+	parseIndexedVars("FILTER_METRICS_WHITE_LIST")
+	parseIndexedVars("FILTER_METRICS_TAG_BLACK_LIST")
+	parseIndexedVars("FILTER_METRICS_TAG_WHITE_LIST")
+
 	nozzelConfig := &NozzelConfig{}
 	err := envconfig.Process("nozzle", nozzelConfig)
 	if err != nil {
@@ -62,8 +97,27 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
+	wavefrontConfig.Filters = &FiltersConfig{}
+	err = envconfig.Process("filter", wavefrontConfig.Filters)
+	if err != nil {
+		return nil, err
+	}
+
 	config := &Config{Nozzel: nozzelConfig, WaveFront: wavefrontConfig}
 	return config, nil
+}
+
+func parseIndexedVars(varName string) {
+	idx := 1
+	for {
+		v := os.Getenv(fmt.Sprintf("%s_%d", varName, idx))
+		if len(v) == 0 {
+			break
+		}
+		newV := fmt.Sprintf("%s,%s", os.Getenv(varName), v)
+		os.Setenv(varName, newV)
+		idx++
+	}
 }
 
 func parseSelectedEvents() ([]events.Envelope_EventType, error) {
