@@ -5,7 +5,11 @@ import (
 	"log"
 	"os"
 
+	metrics "github.com/rcrowley/go-metrics"
+
 	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/wavefronthq/go-metrics-wavefront/reporting"
+	"github.com/wavefronthq/wavefront-sdk-go/application"
 	"github.com/wavefronthq/wavefront-sdk-go/senders"
 )
 
@@ -22,10 +26,17 @@ type EventHandler interface {
 type eventHandlerImpl struct {
 	sender     senders.Sender
 	logger     *log.Logger
+	reporter   reporting.WavefrontMetricsReporter
 	prefix     string
 	foundation string
 	filter     Filter
 	debug      bool
+
+	numMetricsSent             metrics.Counter
+	metricsSendFailure         metrics.Counter
+	numValueMetricReceived     metrics.Counter
+	numCounterEventReceived    metrics.Counter
+	numContainerMetricReceived metrics.Counter
 }
 
 // CreateEventHandler create a new EventHandler
@@ -60,13 +71,36 @@ func CreateEventHandler(conf *WaveFrontConfig) EventHandler {
 		logger.Fatal(errors.New("One of NOZZLE_WF_URL or NOZZLE_WF_PROXY are required"))
 	}
 
+	reporter := reporting.NewReporter(
+		sender,
+		application.New("pcf-nozzle", "internal-metrics"),
+		reporting.Prefix("wavefront-firehose-nozzle.app"),
+	)
+
+	numMetricsSent := metrics.NewCounter()
+	metrics.Register("total-metrics-sent", numMetricsSent)
+	metricsSendFailure := metrics.NewCounter()
+	metrics.Register("metrics-send-failure", metricsSendFailure)
+	numValueMetricReceived := metrics.NewCounter()
+	metrics.Register("value-metric-received", numValueMetricReceived)
+	numCounterEventReceived := metrics.NewCounter()
+	metrics.Register("counter-event-received", numCounterEventReceived)
+	numContainerMetricReceived := metrics.NewCounter()
+	metrics.Register("container-metric-received", numContainerMetricReceived)
+
 	return &eventHandlerImpl{
-		sender:     sender,
-		logger:     logger,
-		prefix:     conf.Prefix,
-		foundation: conf.Foundation,
-		debug:      conf.Debug,
-		filter:     NewGlobFilter(conf.Filters),
+		sender:                     sender,
+		logger:                     logger,
+		reporter:                   reporter,
+		prefix:                     conf.Prefix,
+		foundation:                 conf.Foundation,
+		debug:                      conf.Debug,
+		filter:                     NewGlobFilter(conf.Filters),
+		numMetricsSent:             numMetricsSent,
+		metricsSendFailure:         metricsSendFailure,
+		numValueMetricReceived:     numValueMetricReceived,
+		numCounterEventReceived:    numCounterEventReceived,
+		numContainerMetricReceived: numContainerMetricReceived,
 	}
 }
 
@@ -79,8 +113,8 @@ func (w *eventHandlerImpl) BuildLogMessageEvent(event *events.Envelope) {
 }
 
 func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
-	// >>> Events: origin:"DopplerServer" eventType:ValueMetric timestamp:1544661565385165422 deployment:"cf" job:"doppler" index:"3eba5e5c-069c-4f06-a3d6-ca7faa8df2db" ip:"10.202.6.14" valueMetric:<name:"grpcManager.subscriptions" value:2 unit:"subscriptions" >
-	// MetricName: "<origin>.<name>.<unit>"
+	w.numValueMetricReceived.Inc(1)
+
 	metricName := w.prefix
 	metricName += "." + event.GetOrigin()
 	metricName += "." + event.GetValueMetric().GetName()
@@ -95,6 +129,8 @@ func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
 }
 
 func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
+	w.numCounterEventReceived.Inc(1)
+
 	metricName := w.prefix
 	metricName += "." + event.GetOrigin()
 	metricName += "." + event.GetCounterEvent().GetName()
@@ -112,6 +148,8 @@ func (w *eventHandlerImpl) BuildErrorEvent(event *events.Envelope) {
 }
 
 func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *AppInfo) {
+	w.numContainerMetricReceived.Inc(1)
+
 	metricName := w.prefix + ".container." + event.GetOrigin()
 	source, tags, ts := w.getMetricInfo(event)
 
@@ -187,13 +225,21 @@ func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, sour
 		if err != nil {
 			log.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
 		}
-		log.Printf("[DEBUG] metric: %s", line)
+
+		status := "dropped"
+		if w.filter.Match(name, tags) {
+			status = "acepted"
+		}
+		log.Printf("[DEBUG] [%s] metric: %s", status, line)
 	}
 
 	if w.filter.Match(name, tags) {
 		err := w.sender.SendMetric(name, value, ts, source, tags)
 		if err != nil {
+			w.metricsSendFailure.Inc(1)
 			log.Printf("[ERROR] error sending the metric '%s': %v", name, err)
+		} else {
+			w.numMetricsSent.Inc(1)
 		}
 	}
 }

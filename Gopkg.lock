@@ -18,6 +18,14 @@
   version = "v1.4.2"
 
 [[projects]]
+  digest = "1:780d1a5df3a9a227bf07e7beb6c851ec6ad2614555b1d015d9e2f136d13ad8a7"
+  name = "github.com/caio/go-tdigest"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "f3c8d94f65d3096ac96eda54ffcd10c0fe1477f1"
+  version = "v2.3.0"
+
+[[projects]]
   branch = "master"
   digest = "1:a965e93173d9b30de4cc01c4a2aaaaa0478ece976f56dabb6e662800abf21011"
   name = "github.com/cloudfoundry-community/go-cfclient"
@@ -72,7 +80,7 @@
   version = "v0.2.3"
 
 [[projects]]
-  digest = "1:a9c85389dbd301c97a3499fe15a2b65b505b5f0cb0f1120dea59f1f3d6b11d96"
+  digest = "1:4652941215f23c7ad6546bab86964c72248a1134baa53f0df618661344ba5cac"
   name = "github.com/gogo/protobuf"
   packages = [
     "gogoproto",
@@ -80,8 +88,8 @@
     "protoc-gen-gogo/descriptor",
   ]
   pruneopts = "UT"
-  revision = "4cbf7e384e768b4e01799441fdf2a706a5635ae7"
-  version = "v1.2.0"
+  revision = "ba06b47c162d49f2af050fb4c75bcbc86a159d5c"
+  version = "v1.2.1"
 
 [[projects]]
   digest = "1:97df918963298c287643883209a2c3f642e6593379f97ab400c2a2e219ab647d"
@@ -137,6 +145,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:d38f81081a389f1466ec98192cf9115a82158854d6f01e1c23e2e7554b97db71"
+  name = "github.com/rcrowley/go-metrics"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3113b8401b8a98917cde58f8bbd42a1b1c03b1fd"
+
+[[projects]]
   digest = "1:972c2427413d41a1e06ca4897e8528e5a1622894050e2f527b38ddf0f343f759"
   name = "github.com/stretchr/testify"
   packages = ["assert"]
@@ -145,15 +161,25 @@
   version = "v1.3.0"
 
 [[projects]]
-  digest = "1:634e03daf54aa2b7c7404356b02086384815cc102cbb03c48dc9bc82613e1937"
+  branch = "master"
+  digest = "1:824c381332ceb61e8b78388278c6814ca6251a546a6a61cbb542ff3acadeb278"
+  name = "github.com/wavefronthq/go-metrics-wavefront"
+  packages = ["reporting"]
+  pruneopts = "UT"
+  revision = "c358838d94e0c05d60222e8ca36b88795d7d0416"
+
+[[projects]]
+  digest = "1:f8fa24dccae1fe5bb5e9dbd7adc11588cc6e0a2767576251318835bc4998f13d"
   name = "github.com/wavefronthq/wavefront-sdk-go"
   packages = [
+    "application",
+    "histogram",
     "internal",
     "senders",
   ]
   pruneopts = "UT"
-  revision = "7821ac6d8ae05fe70c6d090ebda380c64f1416e4"
-  version = "v0.9.1"
+  revision = "fa87530cd02a8ad08bd179e1c39fb319a0cc0dae"
+  version = "v0.9.2"
 
 [[projects]]
   branch = "master"
@@ -176,7 +202,7 @@
     "internal",
   ]
   pruneopts = "UT"
-  revision = "3e8b2be1363542a95c52ea0796d4a40dacfb5b95"
+  revision = "4b83411ed2b36bd4e3302e9b1d3c973fb1ba24db"
 
 [[projects]]
   digest = "1:6f3bd49ddf2e104e52062774d797714371fac1b8bddfd8e124ce78e6b2264a10"
@@ -211,7 +237,10 @@
     "github.com/cloudfoundry/sonde-go/events",
     "github.com/gobwas/glob",
     "github.com/kelseyhightower/envconfig",
+    "github.com/rcrowley/go-metrics",
     "github.com/stretchr/testify/assert",
+    "github.com/wavefronthq/go-metrics-wavefront/reporting",
+    "github.com/wavefronthq/wavefront-sdk-go/application",
     "github.com/wavefronthq/wavefront-sdk-go/senders",
   ]
   solver-name = "gps-cdcl"
