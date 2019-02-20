@@ -3,7 +3,6 @@ package nozzle
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/cloudfoundry/sonde-go/events"
@@ -38,33 +37,18 @@ type WaveFrontConfig struct {
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
 	Debug         bool
 
-	Filters *FiltersConfig `ignored:"true"`
+	Filters *Filters `ignored:"true"`
 }
 
-type TagFilter map[string][]string
-
-func (f *TagFilter) Decode(filters string) error {
-	r := regexp.MustCompile(`:\w`)
-	if r.MatchString(filters) {
-		return fmt.Errorf("bad format... 'tagName:[regex]' or 'tagName:[regex, regex1, ... regexX]'")
-	}
-
-	r = regexp.MustCompile(`(\w*):\[([^\]]*)\]`)
-	(*f) = make(map[string][]string)
-	matches := r.FindAllStringSubmatch(filters, -1) // matches is [][]string
-	for _, match := range matches {
-		(*f)[match[1]] = strings.Split(match[2], ",")
-	}
-	return nil
-}
-
-//FiltersConfig holds metrics white and black list filters
-type FiltersConfig struct {
+type filtersConfig struct {
 	MetricsBlackList []string `split_words:"true"`
 	MetricsWhiteList []string `split_words:"true"`
 
 	MetricsTagBlackList TagFilter `split_words:"true"`
 	MetricsTagWhiteList TagFilter `split_words:"true"`
+
+	TagInclude []string `split_words:"true"`
+	TagExclude []string `split_words:"true"`
 }
 
 var defaultEvents = []events.Envelope_EventType{
@@ -97,10 +81,19 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
-	wavefrontConfig.Filters = &FiltersConfig{}
-	err = envconfig.Process("filter", wavefrontConfig.Filters)
+	f := &filtersConfig{}
+	err = envconfig.Process("filter", f)
 	if err != nil {
 		return nil, err
+	}
+
+	wavefrontConfig.Filters = &Filters{
+		MetricsBlackList:    f.MetricsBlackList,
+		MetricsWhiteList:    f.MetricsWhiteList,
+		MetricsTagBlackList: f.MetricsTagBlackList,
+		MetricsTagWhiteList: f.MetricsTagWhiteList,
+		TagInclude:          f.TagInclude,
+		TagExclude:          f.TagExclude,
 	}
 
 	config := &Config{Nozzel: nozzelConfig, WaveFront: wavefrontConfig}

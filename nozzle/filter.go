@@ -1,13 +1,47 @@
 package nozzle
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/gobwas/glob"
 )
 
+// Filter will compare metrics names and tags against regex
 type Filter interface {
 	Match(name string, tags map[string]string) bool
+}
+
+// TagFilter is used to deifne tag filters
+type TagFilter map[string][]string
+
+// Decode env variables into TagFilter type
+func (f *TagFilter) Decode(filters string) error {
+	r := regexp.MustCompile(`:\w`)
+	if r.MatchString(filters) {
+		return fmt.Errorf("bad format... 'tagName:[regex]' or 'tagName:[regex, regex1, ... regexX]'")
+	}
+
+	r = regexp.MustCompile(`(\w*):\[([^\]]*)\]`)
+	(*f) = make(map[string][]string)
+	matches := r.FindAllStringSubmatch(filters, -1) // matches is [][]string
+	for _, match := range matches {
+		(*f)[match[1]] = strings.Split(match[2], ",")
+	}
+	return nil
+}
+
+//Filters holds metrics white and black list filters
+type Filters struct {
+	MetricsBlackList []string
+	MetricsWhiteList []string
+
+	MetricsTagBlackList TagFilter
+	MetricsTagWhiteList TagFilter
+
+	TagInclude []string
+	TagExclude []string
 }
 
 type globFilter struct {
@@ -15,18 +49,19 @@ type globFilter struct {
 	metricBlacklist    glob.Glob
 	metricTagWhitelist map[string]glob.Glob
 	metricTagBlacklist map[string]glob.Glob
-	// tagInclude         glob.Glob
-	// tagExclude         glob.Glob
+	tagInclude         glob.Glob
+	tagExclude         glob.Glob
 }
 
-func NewGlobFilter(cfg *FiltersConfig) Filter {
+// NewGlobFilter grate a new Filter using gobwas/glob as regex engine
+func NewGlobFilter(cfg *Filters) Filter {
 	return &globFilter{
 		metricWhitelist:    compile(cfg.MetricsWhiteList),
 		metricBlacklist:    compile(cfg.MetricsBlackList),
 		metricTagWhitelist: multiCompile(cfg.MetricsTagWhiteList),
 		metricTagBlacklist: multiCompile(cfg.MetricsTagBlackList),
-		// tagInclude:         compile(cfg.TagInclude),
-		// tagExclude:         compile(cfg.TagExclude),
+		tagInclude:         compile(cfg.TagInclude),
+		tagExclude:         compile(cfg.TagExclude),
 	}
 }
 
@@ -71,12 +106,12 @@ func (gf *globFilter) Match(name string, tags map[string]string) bool {
 		return false
 	}
 
-	// if gf.tagInclude != nil {
-	// 	deleteTags(gf.tagInclude, tags, true)
-	// }
-	// if gf.tagExclude != nil {
-	// 	deleteTags(gf.tagExclude, tags, false)
-	// }
+	if gf.tagInclude != nil {
+		deleteTags(gf.tagInclude, tags, true)
+	}
+	if gf.tagExclude != nil {
+		deleteTags(gf.tagExclude, tags, false)
+	}
 	return true
 }
 
