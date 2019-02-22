@@ -29,12 +29,12 @@ func TestTagFilters(t *testing.T) {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
 
-	assert.True(t, contains(config.WaveFront.Filters.MetricsTagBlackList["tag1"], "foo1"))
-	assert.True(t, contains(config.WaveFront.Filters.MetricsTagBlackList["tag1"], "foo2"))
-	assert.True(t, contains(config.WaveFront.Filters.MetricsTagBlackList["tag1"], "foo3"))
-	assert.True(t, contains(config.WaveFront.Filters.MetricsTagBlackList["tag2"], "foo1"))
-	assert.True(t, contains(config.WaveFront.Filters.MetricsTagBlackList["tag2"], "foo2"))
-	assert.False(t, contains(config.WaveFront.Filters.MetricsTagBlackList["tag2"], "foo3"))
+	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo1"))
+	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo2"))
+	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo3"))
+	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo1"))
+	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo2"))
+	assert.False(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo3"))
 
 	os.Setenv("FILTER_METRICS_TAG_BLACK_LIST", "tag1:foo1,foo2,foo3,tag1:foo1")
 	config, err = nozzle.ParseConfig()
@@ -67,21 +67,21 @@ func TestIndexed(t *testing.T) {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
 
-	log.Printf("MetricsBlackList: %v", config.WaveFront.Filters.MetricsBlackList)
-	assert.Equal(t, 4, len(config.WaveFront.Filters.MetricsBlackList))
+	log.Printf("MetricsBlackList: %v", config.Wavefront.Filters.MetricsBlackList)
+	assert.Equal(t, 4, len(config.Wavefront.Filters.MetricsBlackList))
 
-	log.Printf("MetricsWhiteList: %v", config.WaveFront.Filters.MetricsWhiteList)
-	assert.Equal(t, 3, len(config.WaveFront.Filters.MetricsWhiteList))
+	log.Printf("MetricsWhiteList: %v", config.Wavefront.Filters.MetricsWhiteList)
+	assert.Equal(t, 3, len(config.Wavefront.Filters.MetricsWhiteList))
 
-	log.Printf("MetricsTagWhiteList: %v", config.WaveFront.Filters.MetricsTagWhiteList)
-	assert.Equal(t, 1, len(config.WaveFront.Filters.MetricsTagWhiteList))
+	log.Printf("MetricsTagWhiteList: %v", config.Wavefront.Filters.MetricsTagWhiteList)
+	assert.Equal(t, 1, len(config.Wavefront.Filters.MetricsTagWhiteList))
 
-	log.Printf("MetricsTagBlackList: %v", config.WaveFront.Filters.MetricsTagBlackList)
-	assert.Equal(t, 4, len(config.WaveFront.Filters.MetricsTagBlackList))
+	log.Printf("MetricsTagBlackList: %v", config.Wavefront.Filters.MetricsTagBlackList)
+	assert.Equal(t, 4, len(config.Wavefront.Filters.MetricsTagBlackList))
 
-	assert.True(t, contains(config.WaveFront.Filters.MetricsTagBlackList["tag1"], "foo3"))
-	assert.True(t, contains(config.WaveFront.Filters.MetricsBlackList, "foo4"))
-	assert.False(t, contains(config.WaveFront.Filters.MetricsBlackList, "foo5"))
+	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo3"))
+	assert.True(t, contains(config.Wavefront.Filters.MetricsBlackList, "foo4"))
+	assert.False(t, contains(config.Wavefront.Filters.MetricsBlackList, "foo5"))
 }
 
 func TestEmptyIndexed(t *testing.T) {
@@ -93,17 +93,17 @@ func TestEmptyIndexed(t *testing.T) {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
 
-	log.Printf("MetricsBlackList: %v", config.WaveFront.Filters.MetricsBlackList)
-	assert.Equal(t, 0, len(config.WaveFront.Filters.MetricsBlackList))
+	log.Printf("MetricsBlackList: %v", config.Wavefront.Filters.MetricsBlackList)
+	assert.Equal(t, 0, len(config.Wavefront.Filters.MetricsBlackList))
 
-	log.Printf("MetricsWhiteList: %v", config.WaveFront.Filters.MetricsWhiteList)
-	assert.Equal(t, 0, len(config.WaveFront.Filters.MetricsWhiteList))
+	log.Printf("MetricsWhiteList: %v", config.Wavefront.Filters.MetricsWhiteList)
+	assert.Equal(t, 0, len(config.Wavefront.Filters.MetricsWhiteList))
 
-	log.Printf("MetricsTagWhiteList: %v", config.WaveFront.Filters.MetricsTagWhiteList)
-	assert.Equal(t, 0, len(config.WaveFront.Filters.MetricsTagWhiteList))
+	log.Printf("MetricsTagWhiteList: %v", config.Wavefront.Filters.MetricsTagWhiteList)
+	assert.Equal(t, 0, len(config.Wavefront.Filters.MetricsTagWhiteList))
 
-	log.Printf("MetricsTagBlackList: %v", config.WaveFront.Filters.MetricsTagBlackList)
-	assert.Equal(t, 0, len(config.WaveFront.Filters.MetricsTagBlackList))
+	log.Printf("MetricsTagBlackList: %v", config.Wavefront.Filters.MetricsTagBlackList)
+	assert.Equal(t, 0, len(config.Wavefront.Filters.MetricsTagBlackList))
 }
 
 func contains(a []string, x string) bool {

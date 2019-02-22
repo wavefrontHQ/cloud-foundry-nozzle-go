@@ -86,7 +86,7 @@ func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
 		appInfo, ok := s.appsInfo[appGuIG]
 		if !ok {
 			s.appsInfo = s.fetcher.ListApps()
-			appInfo = s.appsInfo[appGuIG]
+			appInfo = s.appsInfo[appGuIG] // TODO: ERROR
 		}
 		s.eventSerializer.BuildContainerEvent(envelope, appInfo)
 	}

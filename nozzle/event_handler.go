@@ -40,7 +40,7 @@ type eventHandlerImpl struct {
 }
 
 // CreateEventHandler create a new EventHandler
-func CreateEventHandler(conf *WaveFrontConfig) EventHandler {
+func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	var sender senders.Sender
 	var err error
 	logger := log.New(os.Stdout, ">>> ", 0)

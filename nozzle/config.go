@@ -11,12 +11,12 @@ import (
 
 // Config holds users provided env variables
 type Config struct {
-	Nozzel    *NozzelConfig
-	WaveFront *WaveFrontConfig
+	Nozzle    *NozzleConfig
+	Wavefront *WavefrontConfig
 }
 
-// NozzelConfig holds specific PCF env variables
-type NozzelConfig struct {
+// NozzleConfig holds specific PCF env variables
+type NozzleConfig struct {
 	APIURL                 string `required:"true" envconfig:"api_url"`
 	Username               string `required:"true"`
 	Password               string `required:"true"`
@@ -26,8 +26,8 @@ type NozzelConfig struct {
 	SelectedEvents []events.Envelope_EventType `ignored:"true"`
 }
 
-// WaveFrontConfig holds specific Wavefront env variables
-type WaveFrontConfig struct {
+// WavefrontConfig holds specific Wavefront env variables
+type WavefrontConfig struct {
 	URL           string `envconfig:"URL"`
 	Token         string `envconfig:"API_TOKEN"`
 	ProxyAddr     string `envconfig:"PROXY_ADDR"`
@@ -63,8 +63,8 @@ func ParseConfig() (*Config, error) {
 	parseIndexedVars("FILTER_METRICS_TAG_BLACK_LIST")
 	parseIndexedVars("FILTER_METRICS_TAG_WHITE_LIST")
 
-	nozzelConfig := &NozzelConfig{}
-	err := envconfig.Process("nozzle", nozzelConfig)
+	nozzleConfig := &NozzleConfig{}
+	err := envconfig.Process("nozzle", nozzleConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -73,9 +73,9 @@ func ParseConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	nozzelConfig.SelectedEvents = selectedEvents
+	nozzleConfig.SelectedEvents = selectedEvents
 
-	wavefrontConfig := &WaveFrontConfig{}
+	wavefrontConfig := &WavefrontConfig{}
 	err = envconfig.Process("wavefront", wavefrontConfig)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func ParseConfig() (*Config, error) {
 		TagExclude:          f.TagExclude,
 	}
 
-	config := &Config{Nozzel: nozzelConfig, WaveFront: wavefrontConfig}
+	config := &Config{Nozzle: nozzleConfig, Wavefront: wavefrontConfig}
 	return config, nil
 }
 

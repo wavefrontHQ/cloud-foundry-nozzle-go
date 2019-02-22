@@ -18,12 +18,12 @@ type AppInfo struct {
 }
 
 // NewAPIClient crate a new ApiClient
-func NewAPIClient(apiURL string, username string, password string, sslSkipVerify bool) (*APIClient, error) {
+func NewAPIClient(conf NozzleConfig) (*APIClient, error) {
 	config := &cfclient.Config{
-		ApiAddress:        apiURL,
-		Username:          username,
-		Password:          password,
-		SkipSslValidation: sslSkipVerify,
+		ApiAddress:        conf.APIURL,
+		Username:          conf.Username,
+		Password:          conf.Password,
+		SkipSslValidation: conf.SkipSSL,
 	}
 
 	client, err := cfclient.NewClient(config)
