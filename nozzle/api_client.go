@@ -90,7 +90,7 @@ func (api *APIClient) GetApp(guid string) *AppInfo {
 			if err != nil {
 				api.logger.Fatal("[ERROR] error getting app info: ", err)
 			}
-			api.appCache.Set(guid, app, 0)
+			api.appCache.Set(guid, newAppInfo(app), 0)
 		}
 		appInfo, found = api.appCache.Get(guid)
 	}
