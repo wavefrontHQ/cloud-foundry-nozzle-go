@@ -83,11 +83,7 @@ func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
 		s.eventSerializer.BuildErrorEvent(envelope)
 	case events.Envelope_ContainerMetric:
 		appGuIG := envelope.GetContainerMetric().GetApplicationId()
-		appInfo, ok := s.appsInfo[appGuIG]
-		if !ok {
-			s.appsInfo = s.fetcher.ListApps()
-			appInfo = s.appsInfo[appGuIG] // TODO: ERROR
-		}
+		appInfo := s.fetcher.GetApp(appGuIG)
 		s.eventSerializer.BuildContainerEvent(envelope, appInfo)
 	}
 }

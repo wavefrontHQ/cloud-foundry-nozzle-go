@@ -117,7 +117,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:aa3d8d42865c42626b5c1add193692d045b3188b1479f0a0a88690d21fe20083"
+  digest = "1:5bf23f15fd4550fa19e9fbc8e9fd2e254444a01f4644ad835b5389d1f7d91077"
   name = "github.com/mailru/easyjson"
   packages = [
     ".",
@@ -126,7 +126,15 @@
     "jwriter",
   ]
   pruneopts = "UT"
-  revision = "60711f1a8329503b04e1c88535f419d0bb440bff"
+  revision = "6243d8e04c3f819e79757e8bc3faa15c3cb27003"
+
+[[projects]]
+  digest = "1:808cdddf087fb64baeae67b8dfaee2069034d9704923a3cb8bd96a995421a625"
+  name = "github.com/patrickmn/go-cache"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
+  version = "v2.1.0"
 
 [[projects]]
   digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
@@ -194,7 +202,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:d970381c0f85a22bee92b4d585ba4ae3c8399cf6796a241449a20fd33762a16b"
+  digest = "1:d2f17df57b1f456188d1716bc2282705408ebc941f77a27f35c018589d228211"
   name = "golang.org/x/oauth2"
   packages = [
     ".",
@@ -202,7 +210,7 @@
     "internal",
   ]
   pruneopts = "UT"
-  revision = "4b83411ed2b36bd4e3302e9b1d3c973fb1ba24db"
+  revision = "9b3c75971fc92dd27c6436a37c05c831498658f1"
 
 [[projects]]
   digest = "1:6f3bd49ddf2e104e52062774d797714371fac1b8bddfd8e124ce78e6b2264a10"
@@ -237,6 +245,7 @@
     "github.com/cloudfoundry/sonde-go/events",
     "github.com/gobwas/glob",
     "github.com/kelseyhightower/envconfig",
+    "github.com/patrickmn/go-cache",
     "github.com/rcrowley/go-metrics",
     "github.com/stretchr/testify/assert",
     "github.com/wavefronthq/go-metrics-wavefront/reporting",

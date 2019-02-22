@@ -12,8 +12,10 @@ import (
 func main() {
 	logger := log.New(os.Stdout, "[WAVEFRONT] ", 0)
 
-	for _, pair := range os.Environ() {
-		logger.Println("env:", pair)
+	if os.Getenv("WAVEFRONT_DEBUG") == "true" {
+		for _, pair := range os.Environ() {
+			logger.Println("env:", pair)
+		}
 	}
 
 	conf, err := nozzle.ParseConfig()
@@ -24,7 +26,7 @@ func main() {
 	var token, trafficControllerURL string
 	logger.Printf("Fetching auth token via API: %v\n", conf.Nozzle.APIURL)
 
-	fetcher, err := nozzle.NewAPIClient(conf.Nozzle)
+	fetcher, err := nozzle.NewAPIClient(conf.Nozzle, logger)
 	if err != nil {
 		logger.Fatal("[ERROR] Unable to build API client", err)
 	}

@@ -1,13 +1,19 @@
 package nozzle
 
 import (
+	"log"
+	"time"
+
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
+	cache "github.com/patrickmn/go-cache"
 )
 
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
 	clientConfig *cfclient.Config
 	client       *cfclient.Client
+	appCache     *cache.Cache
+	logger       *log.Logger
 }
 
 // AppInfo holds Cloud Foundry applications information
@@ -17,8 +23,14 @@ type AppInfo struct {
 	Org   string
 }
 
+func newAppInfo(app cfclient.App) *AppInfo {
+	space, _ := app.Space()
+	org, _ := space.Org()
+	return &AppInfo{Name: app.Name, Space: space.Name, Org: org.Name}
+}
+
 // NewAPIClient crate a new ApiClient
-func NewAPIClient(conf NozzleConfig) (*APIClient, error) {
+func NewAPIClient(conf *NozzleConfig, logger *log.Logger) (*APIClient, error) {
 	config := &cfclient.Config{
 		ApiAddress:        conf.APIURL,
 		Username:          conf.Username,
@@ -34,6 +46,8 @@ func NewAPIClient(conf NozzleConfig) (*APIClient, error) {
 	return &APIClient{
 		clientConfig: config,
 		client:       client,
+		appCache:     cache.New(6*time.Hour, time.Hour),
+		logger:       logger,
 	}, nil
 }
 
@@ -51,15 +65,39 @@ func (api *APIClient) FetchAuthToken() (string, error) {
 	return token, nil
 }
 
-// ListApps wrapper for client.ListApps()
-func (api *APIClient) ListApps() map[string]*AppInfo {
+func (api *APIClient) listApps() map[string]*AppInfo {
 	appsInfo := make(map[string]*AppInfo)
-	apps, _ := api.client.ListApps()
+	apps, err := api.client.ListApps()
+	if err != nil {
+		api.logger.Fatal("[ERROR] error getting apps info: ", err)
+	}
 	for _, app := range apps {
-		space, _ := app.Space()
-		org, _ := space.Org()
-		// fmt.Printf("App Name: %s - guid: %s - Space.Name:%s - org.Name: %s\n", app.Name, app.Guid, space.Name, org.Name)
-		appsInfo[app.Guid] = &AppInfo{Name: app.Name, Space: space.Name, Org: org.Name}
+		appsInfo[app.Guid] = newAppInfo(app)
 	}
 	return appsInfo
+}
+
+// GetApp return cached AppInfo for a guid
+func (api *APIClient) GetApp(guid string) *AppInfo {
+	appInfo, found := api.appCache.Get(guid)
+	if !found {
+		if api.appCache.ItemCount() == 0 {
+			for guid, app := range api.listApps() {
+				api.appCache.Set(guid, app, 0)
+			}
+		} else {
+			app, err := api.client.AppByGuid(guid)
+			if err != nil {
+				api.logger.Fatal("[ERROR] error getting app info: ", err)
+			}
+			api.appCache.Set(guid, app, 0)
+		}
+		appInfo, found = api.appCache.Get(guid)
+	}
+
+	if !found {
+		api.logger.Fatalf("[ERROR]  app '%s' not found", guid)
+	}
+
+	return appInfo.(*AppInfo)
 }

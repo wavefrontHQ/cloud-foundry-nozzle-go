@@ -26,6 +26,10 @@
   name = "github.com/gobwas/glob"
   version = "0.2.3"
 
+[[constraint]]
+  name = "github.com/patrickmn/go-cache"
+  version = "2.1.0"
+
 [prune]
   go-tests = true
   unused-packages = true
