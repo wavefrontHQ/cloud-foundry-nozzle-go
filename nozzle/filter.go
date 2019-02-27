@@ -126,15 +126,6 @@ func matchesTags(matchers map[string]glob.Glob, tags map[string]string) bool {
 	return false
 }
 
-func matchesTag(matcher glob.Glob, tags map[string]string) bool {
-	for k := range tags {
-		if matcher.Match(k) {
-			return true
-		}
-	}
-	return false
-}
-
 func deleteTags(matcher glob.Glob, tags map[string]string, include bool) {
 	for k := range tags {
 		matches := matcher.Match(k)

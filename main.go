@@ -9,10 +9,11 @@ import (
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
 )
 
-func main() {
-	logger := log.New(os.Stdout, "[WAVEFRONT] ", 0)
+var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
+var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
-	if os.Getenv("WAVEFRONT_DEBUG") == "true" {
+func main() {
+	if debug {
 		for _, pair := range os.Environ() {
 			logger.Println("env:", pair)
 		}
@@ -26,7 +27,7 @@ func main() {
 	var token, trafficControllerURL string
 	logger.Printf("Fetching auth token via API: %v\n", conf.Nozzle.APIURL)
 
-	fetcher, err := nozzle.NewAPIClient(conf.Nozzle, logger)
+	fetcher, err := nozzle.NewAPIClient(conf.Nozzle)
 	if err != nil {
 		logger.Fatal("[ERROR] Unable to build API client", err)
 	}

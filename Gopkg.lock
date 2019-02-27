@@ -92,12 +92,12 @@
   version = "v1.2.1"
 
 [[projects]]
-  digest = "1:97df918963298c287643883209a2c3f642e6593379f97ab400c2a2e219ab647d"
+  digest = "1:318f1c959a8a740366fce4b1e1eb2fd914036b4af58fbd0a003349b305f118ad"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   pruneopts = "UT"
-  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
-  version = "v1.2.0"
+  revision = "c823c79ea1570fb5ff454033735a8e68575d1d0f"
+  version = "v1.3.0"
 
 [[projects]]
   digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
@@ -170,11 +170,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:824c381332ceb61e8b78388278c6814ca6251a546a6a61cbb542ff3acadeb278"
+  digest = "1:2280e07b45fd1738935db641e4b0b135aa4ca7248e353d535485638b0f73e21e"
   name = "github.com/wavefronthq/go-metrics-wavefront"
   packages = ["reporting"]
   pruneopts = "UT"
-  revision = "c358838d94e0c05d60222e8ca36b88795d7d0416"
+  revision = "9e50dfd34d67628bcc887f4728df4d57c9fc963a"
 
 [[projects]]
   digest = "1:f8fa24dccae1fe5bb5e9dbd7adc11588cc6e0a2767576251318835bc4998f13d"
@@ -198,11 +198,11 @@
     "context/ctxhttp",
   ]
   pruneopts = "UT"
-  revision = "3a22650c66bd7f4fb6d1e8072ffd7b75c8a27898"
+  revision = "312bce6e941fc7e152b630a8643ea239afc12ddd"
 
 [[projects]]
   branch = "master"
-  digest = "1:d2f17df57b1f456188d1716bc2282705408ebc941f77a27f35c018589d228211"
+  digest = "1:13e1dd706312f7b3ae1ed16a9e251e7b56240a9e09db24de6a4f24bf57968676"
   name = "golang.org/x/oauth2"
   packages = [
     ".",
@@ -210,7 +210,7 @@
     "internal",
   ]
   pruneopts = "UT"
-  revision = "9b3c75971fc92dd27c6436a37c05c831498658f1"
+  revision = "e64efc72b421e893cbf63f17ba2221e7d6d0b0f3"
 
 [[projects]]
   digest = "1:6f3bd49ddf2e104e52062774d797714371fac1b8bddfd8e124ce78e6b2264a10"

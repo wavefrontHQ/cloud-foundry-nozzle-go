@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/kelseyhightower/envconfig"
@@ -23,6 +24,9 @@ type NozzleConfig struct {
 	FirehoseSubscriptionID string `required:"true" envconfig:"firehose_subscription_id"`
 	SkipSSL                bool   `default:"false" envconfig:"skip_ssl"`
 
+	AppCacheExpiration time.Duration `split_words:"true" default:"6h"`
+	AppCacheSize       int           `split_words:"true" default:"50000"`
+
 	SelectedEvents []events.Envelope_EventType `ignored:"true"`
 }
 
@@ -35,7 +39,6 @@ type WavefrontConfig struct {
 	FlushInterval int    `required:"true" envconfig:"FLUSH_INTERVAL"`
 	Prefix        string `required:"true" envconfig:"PREFIX"`
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
-	Debug         bool
 
 	Filters *Filters `ignored:"true"`
 }

@@ -1,8 +1,10 @@
 package nozzle
 
 import (
-	"log"
+	"fmt"
 	"time"
+
+	metrics "github.com/rcrowley/go-metrics"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
 	cache "github.com/patrickmn/go-cache"
@@ -13,7 +15,7 @@ type APIClient struct {
 	clientConfig *cfclient.Config
 	client       *cfclient.Client
 	appCache     *cache.Cache
-	logger       *log.Logger
+	appCacheSize int
 }
 
 // AppInfo holds Cloud Foundry applications information
@@ -24,13 +26,25 @@ type AppInfo struct {
 }
 
 func newAppInfo(app cfclient.App) *AppInfo {
-	space, _ := app.Space()
-	org, _ := space.Org()
+	space, err := app.Space()
+	if err != nil {
+		if debug {
+			logger.Printf("Error getting space name for app '%s'", app.Name)
+		}
+		return &AppInfo{Name: app.Name, Space: "not_found", Org: "not_found"}
+	}
+	org, err := space.Org()
+	if err != nil {
+		if debug {
+			logger.Printf("Error getting org name for app '%s'", app.Name)
+		}
+		return &AppInfo{Name: app.Name, Space: space.Name, Org: "not_found"}
+	}
 	return &AppInfo{Name: app.Name, Space: space.Name, Org: org.Name}
 }
 
 // NewAPIClient crate a new ApiClient
-func NewAPIClient(conf *NozzleConfig, logger *log.Logger) (*APIClient, error) {
+func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 	config := &cfclient.Config{
 		ApiAddress:        conf.APIURL,
 		Username:          conf.Username,
@@ -46,8 +60,8 @@ func NewAPIClient(conf *NozzleConfig, logger *log.Logger) (*APIClient, error) {
 	return &APIClient{
 		clientConfig: config,
 		client:       client,
-		appCache:     cache.New(6*time.Hour, time.Hour),
-		logger:       logger,
+		appCache:     cache.New(conf.AppCacheExpiration, time.Hour),
+		appCacheSize: conf.AppCacheSize,
 	}, nil
 }
 
@@ -69,7 +83,7 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 	appsInfo := make(map[string]*AppInfo)
 	apps, err := api.client.ListApps()
 	if err != nil {
-		api.logger.Fatal("[ERROR] error getting apps info: ", err)
+		logger.Fatal("[ERROR] error getting apps info: ", err)
 	}
 	for _, app := range apps {
 		appsInfo[app.Guid] = newAppInfo(app)
@@ -78,26 +92,53 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 }
 
 // GetApp return cached AppInfo for a guid
-func (api *APIClient) GetApp(guid string) *AppInfo {
+func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
+	size := metrics.GetOrRegisterGauge("cache.size", nil)
+	errors := metrics.GetOrRegisterCounter("cache.errors", nil)
+	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
+	size.Update(int64(api.appCache.ItemCount()))
+
 	appInfo, found := api.appCache.Get(guid)
-	if !found {
-		if api.appCache.ItemCount() == 0 {
-			for guid, app := range api.listApps() {
+	if found {
+		return appInfo.(*AppInfo), nil
+	}
+
+	miss.Inc(1)
+
+	if api.appCache.ItemCount() == 0 {
+		for guid, app := range api.listApps() {
+			if api.appCache.ItemCount() < api.appCacheSize {
 				api.appCache.Set(guid, app, 0)
+			} else {
+				errors.Inc(1)
+				if debug {
+					logger.Printf("[WARN] app cache is full")
+				}
+				break
 			}
-		} else {
-			app, err := api.client.AppByGuid(guid)
-			if err != nil {
-				api.logger.Fatal("[ERROR] error getting app info: ", err)
-			}
-			api.appCache.Set(guid, newAppInfo(app), 0)
 		}
-		appInfo, found = api.appCache.Get(guid)
+	}
+	appInfo, found = api.appCache.Get(guid)
+	if found {
+		return appInfo.(*AppInfo), nil
 	}
 
-	if !found {
-		api.logger.Fatalf("[ERROR]  app '%s' not found", guid)
+	app, err := api.client.AppByGuid(guid)
+	if err != nil {
+		errors.Inc(1)
+		return nil, fmt.Errorf("error getting app info: %v", err)
 	}
 
-	return appInfo.(*AppInfo)
+	appInfo = newAppInfo(app)
+
+	if api.appCache.ItemCount() < api.appCacheSize {
+		api.appCache.Set(guid, newAppInfo(app), 0)
+	} else {
+		errors.Inc(1)
+		if debug {
+			logger.Printf("[WARN] app cache is full")
+		}
+	}
+
+	return appInfo.(*AppInfo), nil
 }

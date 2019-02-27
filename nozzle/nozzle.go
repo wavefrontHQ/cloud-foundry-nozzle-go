@@ -3,9 +3,13 @@ package nozzle
 import (
 	"errors"
 	"log"
+	"os"
 
 	"github.com/cloudfoundry/sonde-go/events"
 )
+
+var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
+var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
 // Nozzle will read all CF events and sent it to the Forwarder
 type Nozzle interface {
@@ -17,7 +21,6 @@ type forwardingNozzle struct {
 	includedEventTypes map[events.Envelope_EventType]bool
 	eventsChannel      <-chan *events.Envelope
 	errorsChannel      <-chan error
-	logger             *log.Logger
 	appsInfo           map[string]*AppInfo
 	fetcher            *APIClient
 }
@@ -28,7 +31,6 @@ func NewNozzle(fetcher *APIClient, eventSerializer EventHandler, selectedEventTy
 		eventSerializer: eventSerializer,
 		eventsChannel:   eventsChannel,
 		errorsChannel:   errors,
-		logger:          logger,
 		fetcher:         fetcher,
 	}
 
@@ -83,11 +85,14 @@ func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
 		s.eventSerializer.BuildErrorEvent(envelope)
 	case events.Envelope_ContainerMetric:
 		appGuIG := envelope.GetContainerMetric().GetApplicationId()
-		appInfo := s.fetcher.GetApp(appGuIG)
+		appInfo, err := s.fetcher.GetApp(appGuIG)
+		if err != nil && debug {
+			logger.Print("[ERROR]", err)
+		}
 		s.eventSerializer.BuildContainerEvent(envelope, appInfo)
 	}
 }
 
 func (s *forwardingNozzle) handleError(err error) {
-	s.logger.Printf("Error from firehose - %v", err)
+	logger.Printf("Error from firehose - %v", err)
 }

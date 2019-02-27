@@ -2,7 +2,6 @@ package nozzle
 
 import (
 	"errors"
-	"log"
 	"os"
 
 	metrics "github.com/rcrowley/go-metrics"
@@ -25,12 +24,10 @@ type EventHandler interface {
 
 type eventHandlerImpl struct {
 	sender     senders.Sender
-	logger     *log.Logger
 	reporter   reporting.WavefrontMetricsReporter
 	prefix     string
 	foundation string
 	filter     Filter
-	debug      bool
 
 	numMetricsSent             metrics.Counter
 	metricsSendFailure         metrics.Counter
@@ -43,7 +40,6 @@ type eventHandlerImpl struct {
 func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	var sender senders.Sender
 	var err error
-	logger := log.New(os.Stdout, ">>> ", 0)
 
 	if conf.URL != "" {
 		directCfg := &senders.DirectConfiguration{
@@ -77,24 +73,17 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 		reporting.Prefix("wavefront-firehose-nozzle.app"),
 	)
 
-	numMetricsSent := metrics.NewCounter()
-	metrics.Register("total-metrics-sent", numMetricsSent)
-	metricsSendFailure := metrics.NewCounter()
-	metrics.Register("metrics-send-failure", metricsSendFailure)
-	numValueMetricReceived := metrics.NewCounter()
-	metrics.Register("value-metric-received", numValueMetricReceived)
-	numCounterEventReceived := metrics.NewCounter()
-	metrics.Register("counter-event-received", numCounterEventReceived)
-	numContainerMetricReceived := metrics.NewCounter()
-	metrics.Register("container-metric-received", numContainerMetricReceived)
+	numMetricsSent := metrics.GetOrRegisterCounter("total-metrics-sent", nil)
+	metricsSendFailure := metrics.GetOrRegisterCounter("metrics-send-failure", nil)
+	numValueMetricReceived := metrics.GetOrRegisterCounter("value-metric-received", nil)
+	numCounterEventReceived := metrics.GetOrRegisterCounter("counter-event-received", nil)
+	numContainerMetricReceived := metrics.GetOrRegisterCounter("container-metric-received", nil)
 
 	return &eventHandlerImpl{
 		sender:                     sender,
-		logger:                     logger,
 		reporter:                   reporter,
 		prefix:                     conf.Prefix,
 		foundation:                 conf.Foundation,
-		debug:                      conf.Debug,
 		filter:                     NewGlobFilter(conf.Filters),
 		numMetricsSent:             numMetricsSent,
 		metricsSendFailure:         metricsSendFailure,
@@ -155,9 +144,11 @@ func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *
 
 	tags["applicationId"] = event.GetContainerMetric().GetApplicationId()
 	tags["instanceIndex"] = string(event.GetContainerMetric().GetInstanceIndex())
-	tags["applicationName"] = appInfo.Name
-	tags["space"] = appInfo.Space
-	tags["org"] = appInfo.Org
+	if appInfo != nil {
+		tags["applicationName"] = appInfo.Name
+		tags["space"] = appInfo.Space
+		tags["org"] = appInfo.Org
+	}
 
 	cpuPercentage := event.GetContainerMetric().GetCpuPercentage()
 	diskBytes := event.GetContainerMetric().GetDiskBytes()
@@ -220,24 +211,24 @@ func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
 }
 
 func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
-	if w.debug {
+	if debug {
 		line, err := senders.MetricLine(name, value, ts, source, tags, "")
 		if err != nil {
-			log.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
+			logger.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
 		}
 
 		status := "dropped"
 		if w.filter.Match(name, tags) {
-			status = "acepted"
+			status = "accepted"
 		}
-		log.Printf("[DEBUG] [%s] metric: %s", status, line)
+		logger.Printf("[DEBUG] [%s] metric: %s", status, line)
 	}
 
 	if w.filter.Match(name, tags) {
 		err := w.sender.SendMetric(name, value, ts, source, tags)
 		if err != nil {
 			w.metricsSendFailure.Inc(1)
-			log.Printf("[ERROR] error sending the metric '%s': %v", name, err)
+			logger.Printf("[ERROR] error sending the metric '%s': %v", name, err)
 		} else {
 			w.numMetricsSent.Inc(1)
 		}
