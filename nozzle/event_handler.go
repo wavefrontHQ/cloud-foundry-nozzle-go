@@ -1,6 +1,7 @@
 package nozzle
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 
@@ -36,12 +37,34 @@ type eventHandlerImpl struct {
 	numContainerMetricReceived metrics.Counter
 }
 
+type vcapServices struct {
+	WavefrontProxy []struct {
+		Credentials struct {
+			Hostname string `json:"hostname"`
+			Port     int    `json:"port"`
+		} `json:"credentials"`
+	} `json:"wavefront-proxy"`
+}
+
 // CreateEventHandler create a new EventHandler
 func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	var sender senders.Sender
 	var err error
 
-	if conf.URL != "" {
+	var services vcapServices
+	json.Unmarshal([]byte(os.Getenv("VCAP_SERVICES")), &services)
+	if len(services.WavefrontProxy) > 0 {
+		logger.Println("'Wavefront Proxy' detected, ignoring user input")
+		proxyCfg := &senders.ProxyConfiguration{
+			Host:                 services.WavefrontProxy[0].Credentials.Hostname,
+			MetricsPort:          services.WavefrontProxy[0].Credentials.Port,
+			FlushIntervalSeconds: conf.FlushInterval,
+		}
+		sender, err = senders.NewProxySender(proxyCfg)
+		if err != nil {
+			logger.Fatal(err)
+		}
+	} else if conf.URL != "" {
 		directCfg := &senders.DirectConfiguration{
 			Server:               conf.URL,
 			Token:                conf.Token,
@@ -64,7 +87,7 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 			logger.Fatal(err)
 		}
 	} else {
-		logger.Fatal(errors.New("One of NOZZLE_WF_URL or NOZZLE_WF_PROXY are required"))
+		logger.Fatal(errors.New("No 'Wavefront Proxy' service detected"))
 	}
 
 	reporter := reporting.NewReporter(
@@ -94,11 +117,11 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 }
 
 func (w *eventHandlerImpl) BuildHTTPStartStopEvent(event *events.Envelope) {
-	// genericSerializer(event)
+	genericSerializer(event)
 }
 
 func (w *eventHandlerImpl) BuildLogMessageEvent(event *events.Envelope) {
-	// genericSerializer(event)
+	genericSerializer(event)
 }
 
 func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
@@ -114,7 +137,7 @@ func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
 
 	w.sendMetric(metricName, value, ts, source, tags)
 
-	w.genericSerializer(event)
+	// genericSerializer(event)
 }
 
 func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
@@ -163,8 +186,8 @@ func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *
 	w.sendMetric(metricName+".memory_bytes_quota", float64(memoryBytesQuota), ts, source, tags)
 }
 
-func (w *eventHandlerImpl) genericSerializer(event *events.Envelope) {
-	// w.logger.Printf("Event: %v", event)
+func genericSerializer(event *events.Envelope) {
+	//logger.Printf("Event: %v", event)
 }
 
 func (w *eventHandlerImpl) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
