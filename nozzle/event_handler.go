@@ -1,7 +1,6 @@
 package nozzle
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 
@@ -37,34 +36,17 @@ type eventHandlerImpl struct {
 	numContainerMetricReceived metrics.Counter
 }
 
-type vcapServices struct {
-	WavefrontProxy []struct {
-		Credentials struct {
-			Hostname string `json:"hostname"`
-			Port     int    `json:"port"`
-		} `json:"credentials"`
-	} `json:"wavefront-proxy"`
-}
-
 // CreateEventHandler create a new EventHandler
 func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	var sender senders.Sender
 	var err error
 
-	var services vcapServices
-	json.Unmarshal([]byte(os.Getenv("VCAP_SERVICES")), &services)
-	if len(services.WavefrontProxy) > 0 {
-		logger.Println("'Wavefront Proxy' detected, ignoring user input")
-		proxyCfg := &senders.ProxyConfiguration{
-			Host:                 services.WavefrontProxy[0].Credentials.Hostname,
-			MetricsPort:          services.WavefrontProxy[0].Credentials.Port,
-			FlushIntervalSeconds: conf.FlushInterval,
-		}
-		sender, err = senders.NewProxySender(proxyCfg)
-		if err != nil {
-			logger.Fatal(err)
-		}
-	} else if conf.URL != "" {
+	if len(conf.ProxyAddr) == 0 {
+		conf.ProxyAddr = os.Getenv("PROXY_CONN_HOST")
+	}
+
+	if len(conf.URL) > 0 && len(conf.Token) > 0 {
+		logger.Printf("Direct connetion to Wavefront: %s", conf.URL)
 		directCfg := &senders.DirectConfiguration{
 			Server:               conf.URL,
 			Token:                conf.Token,
@@ -76,7 +58,8 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 		if err != nil {
 			logger.Fatal(err)
 		}
-	} else if conf.ProxyAddr != "" {
+	} else if len(conf.ProxyAddr) > 0 && conf.ProxyPort > 0 {
+		logger.Printf("Connecting to Wavefront proxy: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
 		proxyCfg := &senders.ProxyConfiguration{
 			Host:                 conf.ProxyAddr,
 			MetricsPort:          conf.ProxyPort,
@@ -87,7 +70,9 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 			logger.Fatal(err)
 		}
 	} else {
-		logger.Fatal(errors.New("No 'Wavefront Proxy' service detected"))
+		logger.Printf("Direct configuration: %s [%s]", conf.URL, conf.Token)
+		logger.Printf("Proxy configuration: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
+		logger.Fatal(errors.New("No Wavefront configuration detected"))
 	}
 
 	reporter := reporting.NewReporter(
