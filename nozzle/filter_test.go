@@ -14,6 +14,15 @@ func TestNoFilters(t *testing.T) {
 	assert.True(t, glob.Match("ko.metric.1", nil))
 }
 
+func TestEmptyFilterString(t *testing.T) {
+	filters := &Filters{}
+	filters.MetricsWhiteList = []string{""}
+	glob := NewGlobFilter(filters)
+
+	assert.True(t, glob.Match("ok.metric.1", nil))
+	assert.True(t, glob.Match("ko.metric.1", nil))
+}
+
 func TestWhiteList(t *testing.T) {
 	filters := &Filters{}
 	filters.MetricsWhiteList = []string{"pcf.bosh-*-forwarder*"}

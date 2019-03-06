@@ -55,6 +55,11 @@ type globFilter struct {
 
 // NewGlobFilter grate a new Filter using gobwas/glob as regex engine
 func NewGlobFilter(cfg *Filters) Filter {
+	cfg.MetricsWhiteList = cleanUp(cfg.MetricsWhiteList)
+	cfg.MetricsBlackList = cleanUp(cfg.MetricsBlackList)
+	cfg.TagInclude = cleanUp(cfg.TagInclude)
+	cfg.TagExclude = cleanUp(cfg.TagExclude)
+
 	logger.Printf("filters: MetricsWhiteList = '%v", cfg.MetricsWhiteList)
 	logger.Printf("filters: MetricsBlackList = '%v", cfg.MetricsBlackList)
 	logger.Printf("filters: MetricsTagWhiteList = '%v", cfg.MetricsTagWhiteList)
@@ -140,4 +145,13 @@ func deleteTags(matcher glob.Glob, tags map[string]string, include bool) {
 			delete(tags, k)
 		}
 	}
+}
+
+func cleanUp(ss []string) (ret []string) {
+	for _, s := range ss {
+		if len(s) > 0 {
+			ret = append(ret, s)
+		}
+	}
+	return
 }
