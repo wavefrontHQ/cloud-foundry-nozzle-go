@@ -13,11 +13,11 @@ var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
 var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
 func main() {
-	if debug {
-		for _, pair := range os.Environ() {
-			logger.Println("env:", pair)
-		}
+	// if debug {
+	for _, pair := range os.Environ() {
+		logger.Println("env:", pair)
 	}
+	// }
 
 	conf, err := nozzle.ParseConfig()
 	if err != nil {
