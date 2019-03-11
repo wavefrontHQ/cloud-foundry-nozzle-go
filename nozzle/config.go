@@ -103,6 +103,8 @@ func ParseConfig() (*Config, error) {
 	return config, nil
 }
 
+// parseIndexedVars append the value of `varName_1, varName_2, varName_N` to `varName`.
+// The index value have to be consecutive
 func parseIndexedVars(varName string) {
 	idx := 1
 	for {

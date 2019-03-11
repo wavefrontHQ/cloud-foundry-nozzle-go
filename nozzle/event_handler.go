@@ -70,7 +70,7 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 			logger.Fatal(err)
 		}
 	} else {
-		logger.Printf("Direct configuration: %s [%s]", conf.URL, conf.Token)
+		logger.Printf("Direct configuration: %s", conf.URL)
 		logger.Printf("Proxy configuration: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
 		logger.Fatal(errors.New("No Wavefront configuration detected"))
 	}
@@ -102,11 +102,9 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 }
 
 func (w *eventHandlerImpl) BuildHTTPStartStopEvent(event *events.Envelope) {
-	genericSerializer(event)
 }
 
 func (w *eventHandlerImpl) BuildLogMessageEvent(event *events.Envelope) {
-	genericSerializer(event)
 }
 
 func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
@@ -121,8 +119,6 @@ func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
 	value := event.GetValueMetric().GetValue()
 
 	w.sendMetric(metricName, value, ts, source, tags)
-
-	// genericSerializer(event)
 }
 
 func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
@@ -141,7 +137,6 @@ func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
 }
 
 func (w *eventHandlerImpl) BuildErrorEvent(event *events.Envelope) {
-	// genericSerializer(event)
 }
 
 func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *AppInfo) {
@@ -169,10 +164,6 @@ func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *
 	w.sendMetric(metricName+".disk_bytes_quota", float64(diskBytesQuota), ts, source, tags)
 	w.sendMetric(metricName+".memory_bytes", float64(memoryBytes), ts, source, tags)
 	w.sendMetric(metricName+".memory_bytes_quota", float64(memoryBytesQuota), ts, source, tags)
-}
-
-func genericSerializer(event *events.Envelope) {
-	//logger.Printf("Event: %v", event)
 }
 
 func (w *eventHandlerImpl) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
