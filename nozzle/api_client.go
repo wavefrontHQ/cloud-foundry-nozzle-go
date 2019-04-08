@@ -2,20 +2,16 @@ package nozzle
 
 import (
 	"fmt"
-	"time"
-
-	metrics "github.com/rcrowley/go-metrics"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
-	cache "github.com/patrickmn/go-cache"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
 	clientConfig *cfclient.Config
 	client       *cfclient.Client
-	appCache     *cache.Cache
-	appCacheSize int
+	appCache     Cache
 }
 
 // AppInfo holds Cloud Foundry applications information
@@ -60,8 +56,7 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 	return &APIClient{
 		clientConfig: config,
 		client:       client,
-		appCache:     cache.New(conf.AppCacheExpiration, time.Hour),
-		appCacheSize: conf.AppCacheSize,
+		appCache:     NewRandomEvictionCache(conf.AppCacheSize),
 	}, nil
 }
 
@@ -93,10 +88,10 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 
 // GetApp return cached AppInfo for a guid
 func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
-	size := metrics.GetOrRegisterGauge("cache.size", nil)
+	//size := metrics.GetOrRegisterGauge("cache.size", nil)
 	errors := metrics.GetOrRegisterCounter("cache.errors", nil)
 	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
-	size.Update(int64(api.appCache.ItemCount()))
+	// size.Update(int64(api.appCache.ItemCount())) TODO! Try to make redis support this.
 
 	appInfo, found := api.appCache.Get(guid)
 	if found {
@@ -105,24 +100,6 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 
 	miss.Inc(1)
 
-	if api.appCache.ItemCount() == 0 {
-		for guid, app := range api.listApps() {
-			if api.appCache.ItemCount() < api.appCacheSize {
-				api.appCache.Set(guid, app, 0)
-			} else {
-				errors.Inc(1)
-				if debug {
-					logger.Printf("[WARN] app cache is full")
-				}
-				break
-			}
-		}
-	}
-	appInfo, found = api.appCache.Get(guid)
-	if found {
-		return appInfo.(*AppInfo), nil
-	}
-
 	app, err := api.client.AppByGuid(guid)
 	if err != nil {
 		errors.Inc(1)
@@ -130,15 +107,5 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 	}
 
 	appInfo = newAppInfo(app)
-
-	if api.appCache.ItemCount() < api.appCacheSize {
-		api.appCache.Set(guid, newAppInfo(app), 0)
-	} else {
-		errors.Inc(1)
-		if debug {
-			logger.Printf("[WARN] app cache is full")
-		}
-	}
-
 	return appInfo.(*AppInfo), nil
 }
