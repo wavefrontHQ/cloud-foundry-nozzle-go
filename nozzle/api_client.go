@@ -17,13 +17,6 @@ type APIClient struct {
 	expiration   time.Duration
 }
 
-// AppInfo holds Cloud Foundry applications information
-type AppInfo struct {
-	Name  string
-	Space string
-	Org   string
-}
-
 func newAppInfo(app cfclient.App) *AppInfo {
 	space, err := app.Space()
 	if err != nil {
@@ -56,11 +49,18 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 		return nil, err
 	}
 
+	var cache Cache
+	if conf.AppCachePreloader != "" {
+		cache = NewPreloadedCache(conf.AppCachePreloader)
+	} else {
+		cache = NewRandomEvictionCache(conf.AppCacheSize)
+	}
+
 	return &APIClient{
 		clientConfig: config,
 		client:       client,
 		expiration:   conf.AppCacheExpiration,
-		appCache:     NewRandomEvictionCache(conf.AppCacheSize),
+		appCache:     cache,
 	}, nil
 }
 

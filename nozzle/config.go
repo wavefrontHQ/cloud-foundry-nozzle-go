@@ -27,6 +27,8 @@ type NozzleConfig struct {
 	AppCacheExpiration time.Duration `split_words:"true" default:"6h"`
 	AppCacheSize       int           `split_words:"true" default:"50000"`
 
+	AppCachePreloader string `split_words:"true" default:""`
+
 	SelectedEvents []events.Envelope_EventType `ignored:"true"`
 }
 
