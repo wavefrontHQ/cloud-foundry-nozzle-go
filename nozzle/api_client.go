@@ -2,6 +2,7 @@ package nozzle
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	metrics "github.com/rcrowley/go-metrics"
@@ -45,8 +46,12 @@ func newAppInfo(app cfclient.App) *AppInfo {
 
 // NewAPIClient crate a new ApiClient
 func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
+	apiURL := conf.APIURL
+	if !strings.HasPrefix(apiURL, "http://") {
+		apiURL = "https://" + apiURL
+	}
 	config := &cfclient.Config{
-		ApiAddress:        conf.APIURL,
+		ApiAddress:        apiURL,
 		Username:          conf.Username,
 		Password:          conf.Password,
 		SkipSslValidation: conf.SkipSSL,
