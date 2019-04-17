@@ -47,7 +47,7 @@ func newAppInfo(app cfclient.App) *AppInfo {
 // NewAPIClient crate a new ApiClient
 func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 	apiURL := conf.APIURL
-	if !strings.HasPrefix(apiURL, "http://") {
+	if !strings.HasPrefix(apiURL, "https://") {
 		apiURL = "https://" + apiURL
 	}
 	config := &cfclient.Config{
