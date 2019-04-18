@@ -51,7 +51,7 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 
 	var cache Cache
 	if conf.AppCachePreloader != "" {
-		cache = NewPreloadedCache(conf.AppCachePreloader)
+		cache = NewPreloadedCache(conf.AppCachePreloader, conf.AppCacheSize)
 	} else {
 		cache = NewRandomEvictionCache(conf.AppCacheSize)
 	}

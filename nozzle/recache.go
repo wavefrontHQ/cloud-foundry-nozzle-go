@@ -2,6 +2,7 @@ package nozzle
 
 import (
 	"container/heap"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -63,6 +64,7 @@ func NewRandomEvictionCache(size int) *RandomEvictionCache {
 	return &c
 }
 
+// Get returns the value for the key if it exists. If it doesn't exist, (nil, false) is returned.
 func (r *RandomEvictionCache) Get(key string) (interface{}, bool) {
 	r.mux.RLock()
 	defer r.mux.RUnlock()
@@ -75,11 +77,19 @@ func (r *RandomEvictionCache) Get(key string) (interface{}, bool) {
 	return nil, false
 }
 
+// Set puts a key-value pair into the cache. If the cache is at capacity, some item will get evicted. The cache always
+// looks for expired items to evict first before it starts evicting live data at random.
 func (r *RandomEvictionCache) Set(key string, value interface{}, ttl time.Duration) {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 
-	expiration := time.Now().Add(ttl).UnixNano()
+	var expiration int64
+	if ttl == 0 {
+		// No expiration (or at least way efter the Universe is gone...)
+		expiration = math.MaxInt64
+	} else {
+		expiration = time.Now().Add(ttl).UnixNano()
+	}
 	ce := &cacheEntry{
 		expiration: expiration,
 		index:      0,
