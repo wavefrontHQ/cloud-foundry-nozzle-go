@@ -50,6 +50,7 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 	}
 
 	var cache Cache
+	logger.Printf("Preloader URL is set to: %s, size is %d", conf.AppCachePreloader, conf.AppCacheSize)
 	if conf.AppCachePreloader != "" {
 		cache = NewPreloadedCache(conf.AppCachePreloader, conf.AppCacheSize)
 	} else {
