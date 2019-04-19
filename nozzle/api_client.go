@@ -2,7 +2,7 @@ package nozzle
 
 import (
 	"fmt"
-	"strings"
+	"net/url"
 	"time"
 
 	metrics "github.com/rcrowley/go-metrics"
@@ -47,7 +47,7 @@ func newAppInfo(app cfclient.App) *AppInfo {
 // NewAPIClient crate a new ApiClient
 func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 	apiURL := conf.APIURL
-	if !strings.HasPrefix(apiURL, "https://") {
+	if !isValidURL(apiURL) {
 		apiURL = "https://" + apiURL
 	}
 	config := &cfclient.Config{
@@ -146,4 +146,13 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 	}
 
 	return appInfo.(*AppInfo), nil
+}
+
+// isValidUrl tests a string to determine if it is a url or not.
+func isValidURL(toTest string) bool {
+	_, err := url.ParseRequestURI(toTest)
+	if err != nil {
+		return false
+	}
+	return true
 }
