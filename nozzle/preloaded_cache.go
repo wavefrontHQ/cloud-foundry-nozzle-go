@@ -1,28 +1,23 @@
 package nozzle
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
 	"sync"
 	"time"
 )
 
-// PreloadedCache is a cache that gets preloaded (and reloaded) from a REST-service returning an array of json-encoded AppInfo
-// structs. If can be used with a variety of custom services for obtaining application metadata. An example is available here:
-// https://github.com/influxdata/influxdb-firehose-nozzle/tree/master/app-api-example
+// PreloadedCache is a cache that gets preloaded (and reloaded) from some backend service abstracted by a Preloader.
 type PreloadedCache struct {
-	apps        *RandomEvictionCache
-	appCacheURL string
-	mux         sync.RWMutex
-	maxSize     int
+	apps      *RandomEvictionCache
+	preloader Preloader
+	mux       sync.RWMutex
+	maxSize   int
 }
 
-// NewPreloadedCache creates a new PreloadedCache with a specified endpoint URL
-func NewPreloadedCache(appCacheURL string, maxSize int) *PreloadedCache {
+// NewPreloadedCache creates a new PreloadedCache with a specified preloader
+func NewPreloadedCache(preloader Preloader, maxSize int) *PreloadedCache {
 	p := &PreloadedCache{
-		appCacheURL: appCacheURL,
-		maxSize:     maxSize,
+		preloader: preloader,
+		maxSize:   maxSize,
 	}
 	p.load()
 	go p.loader()
@@ -58,23 +53,12 @@ func (p *PreloadedCache) loader() {
 }
 
 func (p *PreloadedCache) load() {
-	pres, err := http.Get(p.appCacheURL)
+	pinfo, err := p.preloader.GetAllApps()
 	if err != nil {
 		logger.Printf("[ERROR] Could not load cache. Will keep old cache")
 		p.ensureCache()
 		return
 	}
-
-	pbody, err := ioutil.ReadAll(pres.Body)
-	pres.Body.Close()
-	if err != nil {
-		logger.Printf("[ERROR] Could not load cache. Will keep old cache")
-		p.ensureCache()
-		return
-	}
-
-	var pinfo []AppInfo
-	err = json.Unmarshal(pbody, &pinfo)
 
 	// Create new cache. We allow for an extra 100 apps to come in during the refresh period
 	s := len(pinfo) + 100

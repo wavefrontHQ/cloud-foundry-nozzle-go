@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/cloudfoundry-incubator/uaago"
 	"github.com/cloudfoundry/noaa/consumer"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
 )
@@ -26,7 +25,7 @@ func main() {
 	}
 
 	var trafficControllerURL string
-	logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.UAAURL)
+	logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
 
 	// Set up connection to PAS API using the token we got
 	api, err := nozzle.NewAPIClient(conf.Nozzle)
@@ -57,18 +56,4 @@ func main() {
 	if err != nil {
 		logger.Fatal("[ERROR] Error forwarding", err)
 	}
-}
-
-func fetchAuthToken(url, username, password string, skipSSL bool) (string, error) {
-	uaaClient, err := uaago.NewClient(url)
-	if err != nil {
-		return "", err
-	}
-
-	var authToken string
-	authToken, err = uaaClient.GetAuthToken(username, password, skipSSL)
-	if err != nil {
-		return "", err
-	}
-	return authToken, nil
 }

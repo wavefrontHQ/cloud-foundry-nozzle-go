@@ -3,10 +3,6 @@
   name = "github.com/cloudfoundry-community/go-cfclient"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/cloudfoundry-incubator/uaago"
-
-[[constraint]]
   name = "github.com/cloudfoundry/noaa"
   version = "2.1.0"
 

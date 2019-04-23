@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/cloudfoundry/sonde-go/events"
+
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
 	metrics "github.com/rcrowley/go-metrics"
 )
@@ -39,8 +41,8 @@ func newAppInfo(app cfclient.App) *AppInfo {
 func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 	config := &cfclient.Config{
 		ApiAddress:        conf.APIURL,
-		ClientID:          conf.Username,
-		ClientSecret:      conf.Password,
+		ClientID:          conf.ClientID,
+		ClientSecret:      conf.ClientSecret,
 		SkipSslValidation: conf.SkipSSL,
 	}
 
@@ -50,11 +52,19 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 	}
 
 	var cache Cache
-	logger.Printf("Preloader URL is set to: %s, size is %d", conf.AppCachePreloader, conf.AppCacheSize)
-	if conf.AppCachePreloader != "" {
-		cache = NewPreloadedCache(conf.AppCachePreloader, conf.AppCacheSize)
-	} else {
-		cache = NewRandomEvictionCache(conf.AppCacheSize)
+
+	// The cache is only needed if we're collecting container metrics
+	if conf.HasEventType(events.Envelope_ContainerMetric) {
+		logger.Printf("Preloader URL is set to: %s, size is %d", conf.AppCachePreloader, conf.AppCacheSize)
+		if conf.PreloadAppCache {
+			if conf.AppCachePreloader != "" {
+				cache = NewPreloadedCache(NewExternalPreloader(conf.AppCachePreloader), conf.AppCacheSize)
+			} else {
+				cache = NewPreloadedCache(NewCFPreloader(client), conf.AppCacheSize)
+			}
+		} else {
+			cache = NewRandomEvictionCache(conf.AppCacheSize)
+		}
 	}
 
 	return &APIClient{

@@ -12,3 +12,10 @@ type Cache interface {
 	// from the cache if it's already at capacity.
 	Set(key string, value interface{}, ttl time.Duration)
 }
+
+// Preloader represents a class that's capable of loading the entire list of applications
+// from CF.
+type Preloader interface {
+	// GetAllApps loads the entire list of applications
+	GetAllApps() ([]AppInfo, error)
+}
