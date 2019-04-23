@@ -19,6 +19,7 @@ type Config struct {
 // NozzleConfig holds specific PCF env variables
 type NozzleConfig struct {
 	APIURL                 string `required:"true" envconfig:"api_url"`
+	UAAURL                 string `required:"true" envconfig:"uaa_url"`
 	Username               string `required:"true"`
 	Password               string `required:"true"`
 	FirehoseSubscriptionID string `required:"true" envconfig:"firehose_subscription_id"`

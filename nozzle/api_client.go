@@ -39,8 +39,8 @@ func newAppInfo(app cfclient.App) *AppInfo {
 func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 	config := &cfclient.Config{
 		ApiAddress:        conf.APIURL,
-		Username:          conf.Username,
-		Password:          conf.Password,
+		ClientID:          conf.Username,
+		ClientSecret:      conf.Password,
 		SkipSslValidation: conf.SkipSSL,
 	}
 
@@ -96,7 +96,7 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 	//size := metrics.GetOrRegisterGauge("cache.size", nil)
 	errors := metrics.GetOrRegisterCounter("cache.errors", nil)
 	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
-	// size.Update(int64(api.appCache.ItemCount())) TODO! Try to make redis support this.
+	// size.Update(int64(api.appCache.ItemCount()))
 
 	appInfo, found := api.appCache.Get(guid)
 	if found {

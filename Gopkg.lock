@@ -34,6 +34,14 @@
   revision = "f136f9222381e2fea5099f62e4b751dcb660ff82"
 
 [[projects]]
+  branch = "master"
+  digest = "1:748e0542f42470c57952bca598d750ea1b77fbc479425902c3ad9f11f2911685"
+  name = "github.com/cloudfoundry-incubator/uaago"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8136b7bbe76e26394600a790a95c15eac955f4fc"
+
+[[projects]]
   digest = "1:9148c060d019cb181efbabd6e5858e7727796d62d16f002f23addcf2cc374818"
   name = "github.com/cloudfoundry/noaa"
   packages = [
@@ -233,6 +241,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/cloudfoundry-community/go-cfclient",
+    "github.com/cloudfoundry-incubator/uaago",
     "github.com/cloudfoundry/noaa/consumer",
     "github.com/cloudfoundry/sonde-go/events",
     "github.com/gobwas/glob",
