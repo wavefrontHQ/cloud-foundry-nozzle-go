@@ -3,6 +3,7 @@ package nozzle
 import (
 	"errors"
 	"os"
+	"strings"
 
 	metrics "github.com/rcrowley/go-metrics"
 
@@ -48,8 +49,8 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	if len(conf.URL) > 0 && len(conf.Token) > 0 {
 		logger.Printf("Direct connetion to Wavefront: %s", conf.URL)
 		directCfg := &senders.DirectConfiguration{
-			Server:               conf.URL,
-			Token:                conf.Token,
+			Server:               strings.Trim(conf.URL, " "),
+			Token:                strings.Trim(conf.Token, " "),
 			BatchSize:            10000,
 			MaxBufferSize:        50000,
 			FlushIntervalSeconds: conf.FlushInterval,
@@ -61,7 +62,7 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	} else if len(conf.ProxyAddr) > 0 && conf.ProxyPort > 0 {
 		logger.Printf("Connecting to Wavefront proxy: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
 		proxyCfg := &senders.ProxyConfiguration{
-			Host:                 conf.ProxyAddr,
+			Host:                 strings.Trim(conf.ProxyAddr, " "),
 			MetricsPort:          conf.ProxyPort,
 			FlushIntervalSeconds: conf.FlushInterval,
 		}
@@ -90,8 +91,8 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	return &eventHandlerImpl{
 		sender:                     sender,
 		reporter:                   reporter,
-		prefix:                     conf.Prefix,
-		foundation:                 conf.Foundation,
+		prefix:                     strings.Trim(conf.Prefix, " "),
+		foundation:                 strings.Trim(conf.Foundation, " "),
 		filter:                     NewGlobFilter(conf.Filters),
 		numMetricsSent:             numMetricsSent,
 		metricsSendFailure:         metricsSendFailure,
