@@ -34,9 +34,10 @@ func TestUndersizedCache(t *testing.T) {
 	}
 	hits := 0
 	for i := 0; i < 2000; i++ {
-		_, ok := c.Get(strconv.Itoa(i))
+		v, ok := c.Get(strconv.Itoa(i))
 		if ok {
 			hits++
+			assert.Equal(t, strconv.Itoa(i), v)
 		}
 	}
 	assert.True(t, hits > 900, fmt.Sprintf("Not enough hits: %d", hits))

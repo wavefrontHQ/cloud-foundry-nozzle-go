@@ -85,7 +85,7 @@ func (r *RandomEvictionCache) Set(key string, value interface{}, ttl time.Durati
 
 	var expiration int64
 	if ttl == 0 {
-		// No expiration (or at least way efter the Universe is gone...)
+		// No expiration (or at least way after the Universe is gone...)
 		expiration = math.MaxInt64
 	} else {
 		expiration = time.Now().Add(ttl).UnixNano()

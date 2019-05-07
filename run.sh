@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 export NOZZLE_API_URL=https://api.<domain>
-export NOZZLE_USERNAME=<usr>
-export NOZZLE_PASSWORD=<pass>
+export NOZZLE_CLIENT_ID=<client id>
+export NOZZLE_CLIENT_SECRET=<client secret>
 export NOZZLE_FIREHOSE_SUBSCRIPTION_ID=firehose-subscription-id
 export NOZZLE_SKIP_SSL=true
 export NOZZLE_SELECTED_EVENTS=ValueMetric,CounterEvent,ContainerMetric

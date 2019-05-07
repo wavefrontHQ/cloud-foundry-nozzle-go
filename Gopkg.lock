@@ -34,14 +34,6 @@
   revision = "f136f9222381e2fea5099f62e4b751dcb660ff82"
 
 [[projects]]
-  branch = "master"
-  digest = "1:748e0542f42470c57952bca598d750ea1b77fbc479425902c3ad9f11f2911685"
-  name = "github.com/cloudfoundry-incubator/uaago"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "8136b7bbe76e26394600a790a95c15eac955f4fc"
-
-[[projects]]
   digest = "1:9148c060d019cb181efbabd6e5858e7727796d62d16f002f23addcf2cc374818"
   name = "github.com/cloudfoundry/noaa"
   packages = [
@@ -106,6 +98,14 @@
   pruneopts = "UT"
   revision = "c823c79ea1570fb5ff454033735a8e68575d1d0f"
   version = "v1.3.0"
+
+[[projects]]
+  digest = "1:582b704bebaa06b48c29b0cec224a6058a09c86883aaddabde889cd1a5f73e1b"
+  name = "github.com/google/uuid"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "0cd6bf5da1e1c83f8b45653022c74f71af0538a4"
+  version = "v1.1.1"
 
 [[projects]]
   digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
@@ -241,10 +241,10 @@
   analyzer-version = 1
   input-imports = [
     "github.com/cloudfoundry-community/go-cfclient",
-    "github.com/cloudfoundry-incubator/uaago",
     "github.com/cloudfoundry/noaa/consumer",
     "github.com/cloudfoundry/sonde-go/events",
     "github.com/gobwas/glob",
+    "github.com/google/uuid",
     "github.com/kelseyhightower/envconfig",
     "github.com/rcrowley/go-metrics",
     "github.com/stretchr/testify/assert",

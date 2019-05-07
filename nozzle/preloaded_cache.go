@@ -68,7 +68,8 @@ func (p *PreloadedCache) load() {
 	newApps := NewRandomEvictionCache(s)
 
 	for _, app := range pinfo {
-		newApps.Set(app.Guid, &app, 10*time.Minute)
+		cp := app // Make sure we get a copy of the app and not the loop variant!
+		newApps.Set(app.Guid, &cp, 10*time.Minute)
 	}
 
 	// Atomically overwrite old cache with new
