@@ -19,3 +19,9 @@ type Preloader interface {
 	// GetAllApps loads the entire list of applications
 	GetAllApps() ([]AppInfo, error)
 }
+
+// CacheSource is called when a key isn't found in the cache. It's supposed to connect to some backend data source.
+type CacheSource interface {
+	// GetUncached tries to look up an object in some backend source. It returns an error if not successful.
+	GetUncached(key string) (*AppInfo, error)
+}

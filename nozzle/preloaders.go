@@ -2,10 +2,9 @@ package nozzle
 
 import (
 	"encoding/json"
+	"github.com/cloudfoundry-community/go-cfclient"
 	"io/ioutil"
 	"net/http"
-
-	"github.com/cloudfoundry-community/go-cfclient"
 )
 
 // CFPreloader is a Preloader that reads directly from the CF API
@@ -20,7 +19,7 @@ type ExternalPreloader struct {
 }
 
 // NewCFPreloader creates a new Preloader that wraps the supplied CF client
-func NewCFPreloader(client *cfclient.Client) Preloader {
+func NewCFPreloader(client *cfclient.Client) *CFPreloader {
 	return &CFPreloader{
 		client: client,
 	}
@@ -43,7 +42,7 @@ func (c *CFPreloader) GetAllApps() ([]AppInfo, error) {
 }
 
 // NewExternalPreloader returns a preloader connected to an external source
-func NewExternalPreloader(url string) Preloader {
+func NewExternalPreloader(url string) *ExternalPreloader {
 	return &ExternalPreloader{
 		url: url,
 	}
@@ -65,4 +64,25 @@ func (e *ExternalPreloader) GetAllApps() ([]AppInfo, error) {
 	var ai []AppInfo
 	err = json.Unmarshal(pbody, &ai)
 	return ai, nil
+}
+
+func (e *ExternalPreloader) GetUncached(key string) (*AppInfo, error) {
+	url := e.url
+	if url[len(url)-1] != '/'{
+		url += "/"
+	}
+	pres, err := http.Get(url + key)
+	if err != nil {
+		return nil, err
+	}
+
+	pbody, err := ioutil.ReadAll(pres.Body)
+	pres.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	var ai AppInfo
+	err = json.Unmarshal(pbody, &ai)
+	return &ai, nil
 }

@@ -16,6 +16,7 @@ type APIClient struct {
 	clientConfig *cfclient.Config
 	client       *cfclient.Client
 	appCache     Cache
+	cacheSource  CacheSource
 	expiration   time.Duration
 }
 
@@ -51,28 +52,31 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 		return nil, err
 	}
 
-	var cache Cache
+	api := &APIClient{
+		clientConfig: config,
+		client:       client,
+		expiration:   conf.AppCacheExpiration,
+	}
 
 	// The cache is only needed if we're collecting container metrics
 	if conf.HasEventType(events.Envelope_ContainerMetric) {
 		logger.Printf("Preloader URL is set to: %s, size is %d", conf.AppCachePreloader, conf.AppCacheSize)
 		if conf.PreloadAppCache {
 			if conf.AppCachePreloader != "" {
-				cache = NewPreloadedCache(NewExternalPreloader(conf.AppCachePreloader), conf.AppCacheSize)
+				pl := NewExternalPreloader(conf.AppCachePreloader)
+				api.appCache = NewPreloadedCache(pl, conf.AppCacheSize)
+				api.cacheSource = pl
 			} else {
-				cache = NewPreloadedCache(NewCFPreloader(client), conf.AppCacheSize)
+				api.appCache = NewPreloadedCache(NewCFPreloader(client), conf.AppCacheSize)
+				api.cacheSource = api
 			}
 		} else {
-			cache = NewRandomEvictionCache(conf.AppCacheSize)
+			api.appCache = NewRandomEvictionCache(conf.AppCacheSize)
+			api.cacheSource = api
 		}
 	}
 
-	return &APIClient{
-		clientConfig: config,
-		client:       client,
-		expiration:   conf.AppCacheExpiration,
-		appCache:     cache,
-	}, nil
+	return api, nil
 }
 
 // FetchTrafficControllerURL return Doppler Endpoint URL
@@ -101,11 +105,17 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 	return appsInfo
 }
 
+func (api *APIClient) GetUncached(key string) (*AppInfo, error) {
+	app, err := api.client.AppByGuid(key)
+	if err != nil {
+		return nil, err
+	}
+	return newAppInfo(app), nil
+}
+
 // GetApp return cached AppInfo for a guid
 func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 	//size := metrics.GetOrRegisterGauge("cache.size", nil)
-	errors := metrics.GetOrRegisterCounter("cache.errors", nil)
-	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
 	// size.Update(int64(api.appCache.ItemCount()))
 
 	appInfo, found := api.appCache.Get(guid)
@@ -113,16 +123,16 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 		return appInfo.(*AppInfo), nil
 	}
 
+	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
 	miss.Inc(1)
 	logger.Printf("[DEBUG] Cache miss for key: %s", guid)
 
-	app, err := api.client.AppByGuid(guid)
+	appInfo, err := api.cacheSource.GetUncached(guid)
 	if err != nil {
+		errors := metrics.GetOrRegisterCounter("cache.errors", nil)
 		errors.Inc(1)
 		return nil, fmt.Errorf("error getting app info: %v", err)
 	}
-
-	appInfo = newAppInfo(app)
 
 	// Add a 25% fudge factor to the expiration to prevent all keys from expiring at the same time
 	// causing a burst.
