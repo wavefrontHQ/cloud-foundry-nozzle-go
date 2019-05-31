@@ -3,6 +3,7 @@ package nozzle
 import (
 	"fmt"
 	"math/rand"
+	"net/url"
 	"time"
 
 	"github.com/cloudfoundry/sonde-go/events"
@@ -40,6 +41,10 @@ func newAppInfo(app cfclient.App) *AppInfo {
 
 // NewAPIClient crate a new ApiClient
 func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
+	apiURL := conf.APIURL
+	if !isValidURL(apiURL) {
+		apiURL = "https://" + apiURL
+	}
 	config := &cfclient.Config{
 		ApiAddress:        conf.APIURL,
 		ClientID:          conf.ClientID,
@@ -140,4 +145,13 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 	logger.Printf("[DEBUG] Fudged expiration: %s", e)
 	api.appCache.Set(guid, appInfo, e)
 	return appInfo.(*AppInfo), nil
+}
+
+// isValidUrl tests a string to determine if it is a url or not.
+func isValidURL(toTest string) bool {
+	_, err := url.ParseRequestURI(toTest)
+	if err != nil {
+		return false
+	}
+	return true
 }
