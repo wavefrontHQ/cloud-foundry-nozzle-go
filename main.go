@@ -46,6 +46,7 @@ func main() {
 	noaaConsumer := consumer.New(trafficControllerURL, &tls.Config{
 		InsecureSkipVerify: conf.Nozzle.SkipSSL,
 	}, nil)
+	noaaConsumer.SetDebugPrinter(loggerDebugPrinter{})
 	events, errs := noaaConsumer.Firehose(strings.Trim(conf.Nozzle.FirehoseSubscriptionID, " "), token)
 
 	wavefront := nozzle.CreateEventHandler(conf.Wavefront)
@@ -56,4 +57,11 @@ func main() {
 	if err != nil {
 		logger.Fatal("[ERROR] Error forwarding", err)
 	}
+}
+
+type loggerDebugPrinter struct {
+}
+
+func (loggerDebugPrinter) Print(title, body string) {
+	logger.Printf("[%s] %s", title, body)
 }

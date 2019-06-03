@@ -95,5 +95,5 @@ func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
 
 func (s *forwardingNozzle) handleError(err error) {
 	logger.Printf("Error from firehose - %v", err)
-	logger.Fatal("Forcing restart")
+	// logger.Fatal("Forcing restart")
 }
