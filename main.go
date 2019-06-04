@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/cloudfoundry/noaa/consumer"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
@@ -47,7 +48,7 @@ func main() {
 		InsecureSkipVerify: conf.Nozzle.SkipSSL,
 	}, nil)
 	noaaConsumer.SetDebugPrinter(loggerDebugPrinter{})
-	events, errs := noaaConsumer.Firehose(conf.Nozzle.FirehoseSubscriptionID, token)
+	events, errs := noaaConsumer.Firehose(strings.Trim(conf.Nozzle.FirehoseSubscriptionID, " "), token)
 
 	wavefront := nozzle.CreateEventHandler(conf.Wavefront)
 
