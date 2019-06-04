@@ -4,8 +4,11 @@ import (
 	"errors"
 	"log"
 	"os"
+	"reflect"
 
+	noaaerrors "github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/gorilla/websocket"
 )
 
 var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
@@ -86,7 +89,7 @@ func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
 	case events.Envelope_ContainerMetric:
 		appGuIG := envelope.GetContainerMetric().GetApplicationId()
 		appInfo, err := s.fetcher.GetApp(appGuIG)
-		if err != nil {
+		if err != nil && debug {
 			logger.Print("[ERROR]", err)
 		}
 		s.eventSerializer.BuildContainerEvent(envelope, appInfo)
@@ -94,5 +97,14 @@ func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
 }
 
 func (s *forwardingNozzle) handleError(err error) {
-	logger.Printf("Error from firehose - %v", err)
+	if retryErr, ok := err.(noaaerrors.RetryError); ok {
+		err = retryErr.Err
+	}
+
+	switch closeErr := err.(type) {
+	case *websocket.CloseError:
+		logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
+	default:
+		logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
+	}
 }
