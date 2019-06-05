@@ -2,28 +2,23 @@ package nozzle
 
 import (
 	"fmt"
+	"math/rand"
 	"net/url"
 	"time"
 
-	metrics "github.com/rcrowley/go-metrics"
+	"github.com/cloudfoundry/sonde-go/events"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
-	cache "github.com/patrickmn/go-cache"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
 	clientConfig *cfclient.Config
 	client       *cfclient.Client
-	appCache     *cache.Cache
-	appCacheSize int
-}
-
-// AppInfo holds Cloud Foundry applications information
-type AppInfo struct {
-	Name  string
-	Space string
-	Org   string
+	appCache     Cache
+	cacheSource  CacheSource
+	expiration   time.Duration
 }
 
 func newAppInfo(app cfclient.App) *AppInfo {
@@ -51,9 +46,9 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 		apiURL = "https://" + apiURL
 	}
 	config := &cfclient.Config{
-		ApiAddress:        apiURL,
-		Username:          conf.Username,
-		Password:          conf.Password,
+		ApiAddress:        conf.APIURL,
+		ClientID:          conf.ClientID,
+		ClientSecret:      conf.ClientSecret,
 		SkipSslValidation: conf.SkipSSL,
 	}
 
@@ -62,12 +57,31 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 		return nil, err
 	}
 
-	return &APIClient{
+	api := &APIClient{
 		clientConfig: config,
 		client:       client,
-		appCache:     cache.New(conf.AppCacheExpiration, time.Hour),
-		appCacheSize: conf.AppCacheSize,
-	}, nil
+		expiration:   conf.AppCacheExpiration,
+	}
+
+	// The cache is only needed if we're collecting container metrics
+	if conf.HasEventType(events.Envelope_ContainerMetric) {
+		logger.Printf("Preloader URL is set to: %s, size is %d", conf.AppCachePreloader, conf.AppCacheSize)
+		if conf.PreloadAppCache {
+			if conf.AppCachePreloader != "" {
+				pl := NewExternalPreloader(conf.AppCachePreloader)
+				api.appCache = NewPreloadedCache(pl, conf.AppCacheSize)
+				api.cacheSource = pl
+			} else {
+				api.appCache = NewPreloadedCache(NewCFPreloader(client), conf.AppCacheSize)
+				api.cacheSource = api
+			}
+		} else {
+			api.appCache = NewRandomEvictionCache(conf.AppCacheSize)
+			api.cacheSource = api
+		}
+	}
+
+	return api, nil
 }
 
 // FetchTrafficControllerURL return Doppler Endpoint URL
@@ -96,55 +110,40 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 	return appsInfo
 }
 
+func (api *APIClient) GetUncached(key string) (*AppInfo, error) {
+	app, err := api.client.AppByGuid(key)
+	if err != nil {
+		return nil, err
+	}
+	return newAppInfo(app), nil
+}
+
 // GetApp return cached AppInfo for a guid
 func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
-	size := metrics.GetOrRegisterGauge("cache.size", nil)
-	errors := metrics.GetOrRegisterCounter("cache.errors", nil)
-	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
-	size.Update(int64(api.appCache.ItemCount()))
+	//size := metrics.GetOrRegisterGauge("cache.size", nil)
+	// size.Update(int64(api.appCache.ItemCount()))
 
 	appInfo, found := api.appCache.Get(guid)
 	if found {
 		return appInfo.(*AppInfo), nil
 	}
 
+	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
 	miss.Inc(1)
+	logger.Printf("[DEBUG] Cache miss for key: %s", guid)
 
-	if api.appCache.ItemCount() == 0 {
-		for guid, app := range api.listApps() {
-			if api.appCache.ItemCount() < api.appCacheSize {
-				api.appCache.Set(guid, app, 0)
-			} else {
-				errors.Inc(1)
-				if debug {
-					logger.Printf("[WARN] app cache is full")
-				}
-				break
-			}
-		}
-	}
-	appInfo, found = api.appCache.Get(guid)
-	if found {
-		return appInfo.(*AppInfo), nil
-	}
-
-	app, err := api.client.AppByGuid(guid)
+	appInfo, err := api.cacheSource.GetUncached(guid)
 	if err != nil {
+		errors := metrics.GetOrRegisterCounter("cache.errors", nil)
 		errors.Inc(1)
 		return nil, fmt.Errorf("error getting app info: %v", err)
 	}
 
-	appInfo = newAppInfo(app)
-
-	if api.appCache.ItemCount() < api.appCacheSize {
-		api.appCache.Set(guid, newAppInfo(app), 0)
-	} else {
-		errors.Inc(1)
-		if debug {
-			logger.Printf("[WARN] app cache is full")
-		}
-	}
-
+	// Add a 25% fudge factor to the expiration to prevent all keys from expiring at the same time
+	// causing a burst.
+	e := api.expiration + time.Duration(rand.Int63n(int64(api.expiration/4)))
+	logger.Printf("[DEBUG] Fudged expiration: %s", e)
+	api.appCache.Set(guid, appInfo, e)
 	return appInfo.(*AppInfo), nil
 }
 

@@ -11,9 +11,10 @@ import (
 
 func setUpFooEnv() {
 	os.Setenv("NOZZLE_API_URL", "foo")
-	os.Setenv("NOZZLE_USERNAME", "foo")
-	os.Setenv("NOZZLE_PASSWORD", "foo")
+	os.Setenv("NOZZLE_CLIENT_ID", "foo")
+	os.Setenv("NOZZLE_CLIENT_SECRET", "foo")
 	os.Setenv("NOZZLE_FIREHOSE_SUBSCRIPTION_ID", "foo")
+	os.Setenv("NOZZLE_PRELOAD_APP_CACHE", "true")
 	os.Setenv("WAVEFRONT_FLUSH_INTERVAL", "1")
 	os.Setenv("WAVEFRONT_PREFIX", "foo")
 	os.Setenv("WAVEFRONT_FOUNDATION", "foo")
