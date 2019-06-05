@@ -9,12 +9,12 @@ import (
 
 type DummyPreloader struct {
 	size int
-	ai []AppInfo
+	ai   []AppInfo
 }
 
 func (d *DummyPreloader) GetAllApps() ([]AppInfo, error) {
 	for i := 0; i < d.size; i++ {
-		uuid, err  := uuid.NewRandom()
+		uuid, err := uuid.NewRandom()
 		if err != nil {
 			return nil, err
 		}
@@ -28,7 +28,7 @@ func (d *DummyPreloader) GetAllApps() ([]AppInfo, error) {
 }
 
 func TestOversizedPreloadedCache(t *testing.T) {
-	pl := &DummyPreloader{ size:1000, ai: make([]AppInfo, 1000) }
+	pl := &DummyPreloader{size: 1000, ai: make([]AppInfo, 1000)}
 	c := NewPreloadedCache(pl, 2000)
 	for _, ai := range pl.ai {
 		cai, ok := c.Get(ai.Guid)
@@ -39,7 +39,7 @@ func TestOversizedPreloadedCache(t *testing.T) {
 }
 
 func TestUndersizedPreloadedCache(t *testing.T) {
-	pl := &DummyPreloader{ size:1000, ai: make([]AppInfo, 1000) }
+	pl := &DummyPreloader{size: 1000, ai: make([]AppInfo, 1000)}
 	c := NewPreloadedCache(pl, 200)
 	for _, ai := range pl.ai {
 		cai, ok := c.Get(ai.Guid)

@@ -68,7 +68,7 @@ func (e *ExternalPreloader) GetAllApps() ([]AppInfo, error) {
 
 func (e *ExternalPreloader) GetUncached(key string) (*AppInfo, error) {
 	url := e.url
-	if url[len(url)-1] != '/'{
+	if url[len(url)-1] != '/' {
 		url += "/"
 	}
 	pres, err := http.Get(url + key)
