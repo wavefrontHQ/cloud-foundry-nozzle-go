@@ -4,8 +4,12 @@ import (
 	"errors"
 	"log"
 	"os"
+	"reflect"
 
+	noaaerrors "github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/gorilla/websocket"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
@@ -23,15 +27,17 @@ type forwardingNozzle struct {
 	errorsChannel      <-chan error
 	appsInfo           map[string]*AppInfo
 	fetcher            *APIClient
+	handleErrorMetric  metrics.Counter
 }
 
 // NewNozzle create a new Nozzle
 func NewNozzle(fetcher *APIClient, eventSerializer EventHandler, selectedEventTypes []events.Envelope_EventType, eventsChannel <-chan *events.Envelope, errors <-chan error, logger *log.Logger) Nozzle {
 	nozzle := &forwardingNozzle{
-		eventSerializer: eventSerializer,
-		eventsChannel:   eventsChannel,
-		errorsChannel:   errors,
-		fetcher:         fetcher,
+		eventSerializer:   eventSerializer,
+		eventsChannel:     eventsChannel,
+		errorsChannel:     errors,
+		fetcher:           fetcher,
+		handleErrorMetric: metrics.GetOrRegisterCounter("handleError", nil),
 	}
 
 	nozzle.includedEventTypes = map[events.Envelope_EventType]bool{
@@ -94,5 +100,16 @@ func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
 }
 
 func (s *forwardingNozzle) handleError(err error) {
-	logger.Printf("Error from firehose - %v", err)
+	s.handleErrorMetric.Inc(1)
+
+	if retryErr, ok := err.(noaaerrors.RetryError); ok {
+		err = retryErr.Err
+	}
+
+	switch closeErr := err.(type) {
+	case *websocket.CloseError:
+		logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
+	default:
+		logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
+	}
 }
