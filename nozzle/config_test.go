@@ -20,6 +20,37 @@ func setUpFooEnv() {
 	os.Setenv("WAVEFRONT_FOUNDATION", "foo")
 }
 
+func TestAuthConfig(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("NOZZLE_API_URL", "foo")
+	os.Setenv("NOZZLE_FIREHOSE_SUBSCRIPTION_ID", "foo")
+	os.Setenv("NOZZLE_PRELOAD_APP_CACHE", "true")
+	os.Setenv("WAVEFRONT_FLUSH_INTERVAL", "1")
+	os.Setenv("WAVEFRONT_PREFIX", "foo")
+	os.Setenv("WAVEFRONT_FOUNDATION", "foo")
+
+	_, err := nozzle.ParseConfig()
+	if err == nil {
+		assert.FailNow(t, "[ERROR] Unable to build config from environment")
+	}
+
+	os.Setenv("NOZZLE_CLIENT_ID", "foo")
+	os.Setenv("NOZZLE_CLIENT_SECRET", "foo")
+
+	_, err = nozzle.ParseConfig()
+	if err != nil {
+		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
+	}
+
+	os.Setenv("NOZZLE_USERNAME", "foo")
+	os.Setenv("NOZZLE_PASSWORD", "foo")
+
+	_, err = nozzle.ParseConfig()
+	if err == nil {
+		assert.FailNow(t, "[ERROR] Unable to build config from environment")
+	}
+}
+
 func TestTagFilters(t *testing.T) {
 	os.Clearenv()
 	setUpFooEnv()

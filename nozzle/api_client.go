@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry/sonde-go/events"
@@ -41,15 +42,21 @@ func newAppInfo(app cfclient.App) *AppInfo {
 
 // NewAPIClient crate a new ApiClient
 func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
-	apiURL := conf.APIURL
+	apiURL := strings.Trim(conf.APIURL, " ")
 	if !isValidURL(apiURL) {
 		apiURL = "https://" + apiURL
 	}
 	config := &cfclient.Config{
-		ApiAddress:        conf.APIURL,
-		ClientID:          conf.ClientID,
-		ClientSecret:      conf.ClientSecret,
+		ApiAddress:        apiURL,
 		SkipSslValidation: conf.SkipSSL,
+	}
+
+	if conf.hasUserPass() {
+		config.Username = strings.Trim(conf.Username, " ")
+		config.Password = strings.Trim(conf.Password, " ")
+	} else {
+		config.ClientID = strings.Trim(conf.ClientID, " ")
+		config.ClientSecret = strings.Trim(conf.ClientSecret, " ")
 	}
 
 	client, err := cfclient.NewClient(config)
