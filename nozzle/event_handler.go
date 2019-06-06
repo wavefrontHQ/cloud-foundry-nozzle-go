@@ -2,11 +2,15 @@ package nozzle
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
+	"github.com/gorilla/websocket"
 	metrics "github.com/rcrowley/go-metrics"
 
+	noaaerrors "github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 	"github.com/wavefronthq/wavefront-sdk-go/application"
@@ -23,6 +27,7 @@ type EventHandler interface {
 	BuildCounterEvent(event *events.Envelope)
 	BuildErrorEvent(event *events.Envelope)
 	BuildContainerEvent(event *events.Envelope, appInfo *AppInfo)
+	ReportError(err error)
 }
 
 type eventHandlerImpl struct {
@@ -37,6 +42,7 @@ type eventHandlerImpl struct {
 	numValueMetricReceived     metrics.Counter
 	numCounterEventReceived    metrics.Counter
 	numContainerMetricReceived metrics.Counter
+	handleErrorMetric          metrics.Counter
 }
 
 // CreateEventHandler create a new EventHandler
@@ -84,11 +90,28 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 		reporting.Prefix("wavefront-firehose-nozzle.app"),
 	)
 
-	numMetricsSent := metrics.GetOrRegisterCounter("total-metrics-sent", nil)
-	metricsSendFailure := metrics.GetOrRegisterCounter("metrics-send-failure", nil)
-	numValueMetricReceived := metrics.GetOrRegisterCounter("value-metric-received", nil)
-	numCounterEventReceived := metrics.GetOrRegisterCounter("counter-event-received", nil)
-	numContainerMetricReceived := metrics.GetOrRegisterCounter("container-metric-received", nil)
+	internalTags := map[string]string{
+		"foundation":               conf.Foundation,
+		"firehose-subscription-id": os.Getenv("NOZZLE_FIREHOSE_SUBSCRIPTION_ID"),
+	}
+
+	app, err := GetVcapApp()
+	if err == nil {
+		internalTags["application_id"] = app.ID
+		internalTags["application_idx"] = fmt.Sprint(app.Idx)
+		internalTags["application_name"] = app.Name
+	} else {
+		logger.Printf("[ERROR] %v", err)
+	}
+
+	logger.Printf("internalTags: %v", internalTags)
+
+	numMetricsSent := newCounter("total-metrics-sent", internalTags)
+	metricsSendFailure := newCounter("metrics-send-failure", internalTags)
+	numValueMetricReceived := newCounter("value-metric-received", internalTags)
+	numCounterEventReceived := newCounter("counter-event-received", internalTags)
+	numContainerMetricReceived := newCounter("container-metric-received", internalTags)
+	handleErrorMetric := newCounter("handleError", internalTags)
 
 	return &eventHandlerImpl{
 		sender:                     sender,
@@ -101,7 +124,12 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 		numValueMetricReceived:     numValueMetricReceived,
 		numCounterEventReceived:    numCounterEventReceived,
 		numContainerMetricReceived: numContainerMetricReceived,
+		handleErrorMetric:          handleErrorMetric,
 	}
+}
+
+func newCounter(name string, tags map[string]string) metrics.Counter {
+	return reporting.GetOrRegisterMetric(name, metrics.NewCounter(), tags).(metrics.Counter)
 }
 
 func (w *eventHandlerImpl) BuildHTTPStartStopEvent(event *events.Envelope) {
@@ -234,5 +262,20 @@ func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, sour
 		} else {
 			w.numMetricsSent.Inc(1)
 		}
+	}
+}
+
+func (w *eventHandlerImpl) ReportError(err error) {
+	w.handleErrorMetric.Inc(1)
+
+	if retryErr, ok := err.(noaaerrors.RetryError); ok {
+		err = retryErr.Err
+	}
+
+	switch closeErr := err.(type) {
+	case *websocket.CloseError:
+		logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
+	default:
+		logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
 	}
 }
