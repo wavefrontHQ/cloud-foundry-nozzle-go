@@ -100,14 +100,6 @@
   version = "v1.3.0"
 
 [[projects]]
-  digest = "1:582b704bebaa06b48c29b0cec224a6058a09c86883aaddabde889cd1a5f73e1b"
-  name = "github.com/google/uuid"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "0cd6bf5da1e1c83f8b45653022c74f71af0538a4"
-  version = "v1.1.1"
-
-[[projects]]
   digest = "1:7b5c6e2eeaa9ae5907c391a91c132abfd5c9e8a784a341b5625e750c67e6825d"
   name = "github.com/gorilla/websocket"
   packages = ["."]
@@ -135,6 +127,14 @@
   ]
   pruneopts = "UT"
   revision = "6243d8e04c3f819e79757e8bc3faa15c3cb27003"
+
+[[projects]]
+  digest = "1:808cdddf087fb64baeae67b8dfaee2069034d9704923a3cb8bd96a995421a625"
+  name = "github.com/patrickmn/go-cache"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0"
+  version = "v2.1.0"
 
 [[projects]]
   digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
@@ -244,8 +244,8 @@
     "github.com/cloudfoundry/noaa/consumer",
     "github.com/cloudfoundry/sonde-go/events",
     "github.com/gobwas/glob",
-    "github.com/google/uuid",
     "github.com/kelseyhightower/envconfig",
+    "github.com/patrickmn/go-cache",
     "github.com/rcrowley/go-metrics",
     "github.com/stretchr/testify/assert",
     "github.com/wavefronthq/go-metrics-wavefront/reporting",

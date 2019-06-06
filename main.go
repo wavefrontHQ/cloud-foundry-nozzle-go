@@ -24,20 +24,19 @@ func main() {
 		logger.Fatal("[ERROR] Unable to build config from environment: ", err)
 	}
 
-	var trafficControllerURL string
-	logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
+	var token, trafficControllerURL string
+	logger.Printf("Fetching auth token via API: %v\n", conf.Nozzle.APIURL)
 
-	// Set up connection to PAS API using the token we got
-	api, err := nozzle.NewAPIClient(conf.Nozzle)
+	fetcher, err := nozzle.NewAPIClient(conf.Nozzle)
 	if err != nil {
-		logger.Fatal("[ERROR] Unable to build API client: ", err)
+		logger.Fatal("[ERROR] Unable to build API client", err)
+	}
+	token, err = fetcher.FetchAuthToken()
+	if err != nil {
+		logger.Fatal("[ERROR] Unable to fetch token via API", err)
 	}
 
-	token, err := api.FetchAuthToken()
-	if err != nil {
-		logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
-	}
-	trafficControllerURL = api.FetchTrafficControllerURL()
+	trafficControllerURL = fetcher.FetchTrafficControllerURL()
 	if trafficControllerURL == "" {
 		logger.Fatal("[ERROR] trafficControllerURL from client was blank")
 	}
@@ -46,22 +45,14 @@ func main() {
 	noaaConsumer := consumer.New(trafficControllerURL, &tls.Config{
 		InsecureSkipVerify: conf.Nozzle.SkipSSL,
 	}, nil)
-	noaaConsumer.SetDebugPrinter(loggerDebugPrinter{})
 	events, errs := noaaConsumer.Firehose(conf.Nozzle.FirehoseSubscriptionID, token)
 
 	wavefront := nozzle.CreateEventHandler(conf.Wavefront)
 
 	logger.Printf("Forwarding events: %s", conf.Nozzle.SelectedEvents)
-	forwarder := nozzle.NewNozzle(api, wavefront, conf.Nozzle.SelectedEvents, events, errs, logger)
+	forwarder := nozzle.NewNozzle(fetcher, wavefront, conf.Nozzle.SelectedEvents, events, errs, logger)
 	err = forwarder.Run()
 	if err != nil {
 		logger.Fatal("[ERROR] Error forwarding", err)
 	}
-}
-
-type loggerDebugPrinter struct {
-}
-
-func (loggerDebugPrinter) Print(title, body string) {
-	logger.Printf("[%s] %s", title, body)
 }

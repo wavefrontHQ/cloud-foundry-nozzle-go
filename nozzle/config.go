@@ -19,16 +19,13 @@ type Config struct {
 // NozzleConfig holds specific PCF env variables
 type NozzleConfig struct {
 	APIURL                 string `required:"true" envconfig:"api_url"`
-	ClientID               string `required:"true" envconfig:"client_id"`
-	ClientSecret           string `required:"true" envconfig:"client_secret"`
+	Username               string `required:"true"`
+	Password               string `required:"true"`
 	FirehoseSubscriptionID string `required:"true" envconfig:"firehose_subscription_id"`
 	SkipSSL                bool   `default:"false" envconfig:"skip_ssl"`
 
 	AppCacheExpiration time.Duration `split_words:"true" default:"6h"`
 	AppCacheSize       int           `split_words:"true" default:"50000"`
-	PreloadAppCache    bool          `split_words:"true" default:"true"`
-
-	AppCachePreloader string `split_words:"true" default:""`
 
 	SelectedEvents []events.Envelope_EventType `ignored:"true"`
 }
@@ -104,16 +101,6 @@ func ParseConfig() (*Config, error) {
 
 	config := &Config{Nozzle: nozzleConfig, Wavefront: wavefrontConfig}
 	return config, nil
-}
-
-// HasEventType returns true if a named event type is enabled.
-func (n *NozzleConfig) HasEventType(e events.Envelope_EventType) bool {
-	for _, s := range n.SelectedEvents {
-		if s == e {
-			return true
-		}
-	}
-	return false
 }
 
 // parseIndexedVars append the value of `varName_1, varName_2, varName_N` to `varName`.
