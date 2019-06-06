@@ -13,6 +13,8 @@ import (
 	"github.com/wavefronthq/wavefront-sdk-go/senders"
 )
 
+var trace = os.Getenv("WAVEFRONT_TRACE") == "true"
+
 // EventHandler receive CF events and send metrics to WF
 type EventHandler interface {
 	BuildHTTPStartStopEvent(event *events.Envelope)
@@ -211,7 +213,7 @@ func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
 }
 
 func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
-	if debug {
+	if trace {
 		line, err := senders.MetricLine(name, value, ts, source, tags, "")
 		if err != nil {
 			logger.Printf("[ERROR] error preparing the metric '%s': %v", name, err)

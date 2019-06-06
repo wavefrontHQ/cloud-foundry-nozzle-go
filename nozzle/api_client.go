@@ -137,7 +137,9 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 
 	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
 	miss.Inc(1)
-	logger.Printf("[DEBUG] Cache miss for key: %s", guid)
+	if debug {
+		logger.Printf("[DEBUG] Cache miss for key: %s", guid)
+	}
 
 	appInfo, err := api.cacheSource.GetUncached(guid)
 	if err != nil {
@@ -149,7 +151,9 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 	// Add a 25% fudge factor to the expiration to prevent all keys from expiring at the same time
 	// causing a burst.
 	e := api.expiration + time.Duration(rand.Int63n(int64(api.expiration/4)))
-	logger.Printf("[DEBUG] Fudged expiration: %s", e)
+	if debug {
+		logger.Printf("[DEBUG] Fudged expiration: %s", e)
+	}
 	api.appCache.Set(guid, appInfo, e)
 	return appInfo.(*AppInfo), nil
 }

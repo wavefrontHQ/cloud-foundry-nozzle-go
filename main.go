@@ -46,7 +46,9 @@ func main() {
 	noaaConsumer := consumer.New(trafficControllerURL, &tls.Config{
 		InsecureSkipVerify: conf.Nozzle.SkipSSL,
 	}, nil)
-	noaaConsumer.SetDebugPrinter(loggerDebugPrinter{})
+	if debug {
+		noaaConsumer.SetDebugPrinter(loggerDebugPrinter{})
+	}
 	events, errs := noaaConsumer.Firehose(conf.Nozzle.FirehoseSubscriptionID, token)
 
 	wavefront := nozzle.CreateEventHandler(conf.Wavefront)
