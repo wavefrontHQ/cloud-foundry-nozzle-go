@@ -2,6 +2,7 @@ package nozzle
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/cloudfoundry-community/go-cfclient"
 	"io/ioutil"
 	"net/http"
@@ -55,6 +56,11 @@ func (e *ExternalPreloader) GetAllApps() ([]AppInfo, error) {
 		return nil, err
 	}
 
+	code := pres.StatusCode
+	if code/100 != 2 {
+		return nil, fmt.Errorf("error getting all apps status=%s code=%d", pres.Status, pres.StatusCode)
+	}
+
 	pbody, err := ioutil.ReadAll(pres.Body)
 	pres.Body.Close()
 	if err != nil {
@@ -74,6 +80,11 @@ func (e *ExternalPreloader) GetUncached(key string) (*AppInfo, error) {
 	pres, err := http.Get(url + key)
 	if err != nil {
 		return nil, err
+	}
+
+	code := pres.StatusCode
+	if code/100 != 2 {
+		return nil, fmt.Errorf("error getting appInfo status=%s code=%d", pres.Status, pres.StatusCode)
 	}
 
 	pbody, err := ioutil.ReadAll(pres.Body)
