@@ -13,12 +13,6 @@ var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
 var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
 func main() {
-	if debug {
-		for _, pair := range os.Environ() {
-			logger.Println("env:", pair)
-		}
-	}
-
 	conf, err := nozzle.ParseConfig()
 	if err != nil {
 		logger.Fatal("[ERROR] Unable to build config from environment: ", err)
@@ -46,7 +40,6 @@ func main() {
 	noaaConsumer := consumer.New(trafficControllerURL, &tls.Config{
 		InsecureSkipVerify: conf.Nozzle.SkipSSL,
 	}, nil)
-	noaaConsumer.SetDebugPrinter(loggerDebugPrinter{})
 	events, errs := noaaConsumer.Firehose(conf.Nozzle.FirehoseSubscriptionID, token)
 
 	wavefront := nozzle.CreateEventHandler(conf.Wavefront)

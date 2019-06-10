@@ -77,7 +77,9 @@ func (p *PreloadedCache) load() {
 	defer p.mux.Unlock()
 	p.apps = newApps
 
-	logger.Printf("[DEBUG] Preloaded %d applications", len(pinfo))
+	if debug {
+		logger.Printf("[DEBUG] Preloaded %d applications", len(pinfo))
+	}
 }
 
 func (p *PreloadedCache) ensureCache() {

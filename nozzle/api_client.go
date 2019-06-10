@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry/sonde-go/events"
@@ -41,15 +42,21 @@ func newAppInfo(app cfclient.App) *AppInfo {
 
 // NewAPIClient crate a new ApiClient
 func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
-	apiURL := conf.APIURL
+	apiURL := strings.Trim(conf.APIURL, " ")
 	if !isValidURL(apiURL) {
 		apiURL = "https://" + apiURL
 	}
 	config := &cfclient.Config{
-		ApiAddress:        conf.APIURL,
-		ClientID:          conf.ClientID,
-		ClientSecret:      conf.ClientSecret,
+		ApiAddress:        apiURL,
 		SkipSslValidation: conf.SkipSSL,
+	}
+
+	if conf.hasUserPass() {
+		config.Username = strings.Trim(conf.Username, " ")
+		config.Password = strings.Trim(conf.Password, " ")
+	} else {
+		config.ClientID = strings.Trim(conf.ClientID, " ")
+		config.ClientSecret = strings.Trim(conf.ClientSecret, " ")
 	}
 
 	client, err := cfclient.NewClient(config)
@@ -130,7 +137,9 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 
 	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
 	miss.Inc(1)
-	logger.Printf("[DEBUG] Cache miss for key: %s", guid)
+	if debug {
+		logger.Printf("[DEBUG] Cache miss for key: %s", guid)
+	}
 
 	appInfo, err := api.cacheSource.GetUncached(guid)
 	if err != nil {
@@ -142,7 +151,9 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 	// Add a 25% fudge factor to the expiration to prevent all keys from expiring at the same time
 	// causing a burst.
 	e := api.expiration + time.Duration(rand.Int63n(int64(api.expiration/4)))
-	logger.Printf("[DEBUG] Fudged expiration: %s", e)
+	if debug {
+		logger.Printf("[DEBUG] Fudged expiration: %s", e)
+	}
 	api.appCache.Set(guid, appInfo, e)
 	return appInfo.(*AppInfo), nil
 }

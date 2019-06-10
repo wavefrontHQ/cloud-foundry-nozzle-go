@@ -19,8 +19,10 @@ type Config struct {
 // NozzleConfig holds specific PCF env variables
 type NozzleConfig struct {
 	APIURL                 string `required:"true" envconfig:"api_url"`
-	ClientID               string `required:"true" envconfig:"client_id"`
-	ClientSecret           string `required:"true" envconfig:"client_secret"`
+	Username               string `required:"false"`
+	Password               string `required:"false"`
+	ClientID               string `required:"false" envconfig:"client_id"`
+	ClientSecret           string `required:"false" envconfig:"client_secret"`
 	FirehoseSubscriptionID string `required:"true" envconfig:"firehose_subscription_id"`
 	SkipSSL                bool   `default:"false" envconfig:"skip_ssl"`
 
@@ -75,6 +77,14 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
+	if !nozzleConfig.hasClientSecret() && !nozzleConfig.hasUserPass() {
+		return nil, fmt.Errorf("'NOZZLE_USERNAME'-'NOZZLE_PASSWORD' or 'NOZZLE_CLIENT_ID'-'NOZZLE_CLIENT_SECRET' are required")
+	}
+
+	if nozzleConfig.hasClientSecret() && nozzleConfig.hasUserPass() {
+		return nil, fmt.Errorf("only provide one config 'NOZZLE_USERNAME'-'NOZZLE_PASSWORD' or 'NOZZLE_CLIENT_ID'-'NOZZLE_CLIENT_SECRET'")
+	}
+
 	selectedEvents, err := parseSelectedEvents()
 	if err != nil {
 		return nil, err
@@ -104,6 +114,14 @@ func ParseConfig() (*Config, error) {
 
 	config := &Config{Nozzle: nozzleConfig, Wavefront: wavefrontConfig}
 	return config, nil
+}
+
+func (n NozzleConfig) hasUserPass() bool {
+	return len(n.Username) > 0 && len(n.Password) > 0
+}
+
+func (n NozzleConfig) hasClientSecret() bool {
+	return len(n.ClientID) > 0 && len(n.ClientSecret) > 0
 }
 
 // HasEventType returns true if a named event type is enabled.
