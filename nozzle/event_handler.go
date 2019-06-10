@@ -111,7 +111,7 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	numValueMetricReceived := newCounter("value-metric-received", internalTags)
 	numCounterEventReceived := newCounter("counter-event-received", internalTags)
 	numContainerMetricReceived := newCounter("container-metric-received", internalTags)
-	handleErrorMetric := newCounter("handleError", internalTags)
+	handleErrorMetric := newCounter("firehose-connection-error", internalTags)
 
 	return &eventHandlerImpl{
 		sender:                     sender,
