@@ -4,13 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 
-	"github.com/gorilla/websocket"
 	metrics "github.com/rcrowley/go-metrics"
 
-	noaaerrors "github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 	"github.com/wavefronthq/wavefront-sdk-go/application"
@@ -267,15 +264,4 @@ func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, sour
 
 func (w *eventHandlerImpl) ReportError(err error) {
 	w.handleErrorMetric.Inc(1)
-
-	if retryErr, ok := err.(noaaerrors.RetryError); ok {
-		err = retryErr.Err
-	}
-
-	switch closeErr := err.(type) {
-	case *websocket.CloseError:
-		logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
-	default:
-		logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
-	}
 }
