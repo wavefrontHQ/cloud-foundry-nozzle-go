@@ -61,11 +61,11 @@ func main() {
 			for {
 				select {
 				case event, ok := <-events:
-					if !ok {
-						close(done)
-						return
+					if ok {
+						eventsBuff <- event
+					} else {
+						logger.Printf("eventsChannel channel closed")
 					}
-					eventsBuff <- event
 				case err := <-errs:
 					if retryErr, ok := err.(noaaerrors.RetryError); ok {
 						err = retryErr.Err
