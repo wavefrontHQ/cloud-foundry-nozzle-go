@@ -1,7 +1,6 @@
 package nozzle
 
 import (
-	"errors"
 	"log"
 	"os"
 
@@ -13,7 +12,7 @@ var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
 // Nozzle will read all CF events and sent it to the Forwarder
 type Nozzle interface {
-	Run() error
+	SetAPIClient(*APIClient)
 }
 
 type forwardingNozzle struct {
@@ -26,12 +25,11 @@ type forwardingNozzle struct {
 }
 
 // NewNozzle create a new Nozzle
-func NewNozzle(fetcher *APIClient, eventSerializer EventHandler, selectedEventTypes []events.Envelope_EventType, eventsChannel <-chan *events.Envelope, errors <-chan error, logger *log.Logger) Nozzle {
+func NewNozzle(eventSerializer EventHandler, selectedEventTypes []events.Envelope_EventType, eventsChannel <-chan *events.Envelope, errors <-chan error) Nozzle {
 	nozzle := &forwardingNozzle{
 		eventSerializer: eventSerializer,
 		eventsChannel:   eventsChannel,
 		errorsChannel:   errors,
-		fetcher:         fetcher,
 	}
 
 	nozzle.includedEventTypes = map[events.Envelope_EventType]bool{
@@ -46,22 +44,21 @@ func NewNozzle(fetcher *APIClient, eventSerializer EventHandler, selectedEventTy
 		nozzle.includedEventTypes[selectedEventType] = true
 	}
 
+	go nozzle.run()
 	return nozzle
 }
 
-func (s *forwardingNozzle) Run() error {
+func (s *forwardingNozzle) SetAPIClient(api *APIClient) {
+	s.fetcher = api
+}
+
+func (s *forwardingNozzle) run() {
 	for {
 		select {
-		case event, ok := <-s.eventsChannel:
-			if !ok {
-				return errors.New("eventsChannel channel closed")
-			}
+		case event := <-s.eventsChannel:
 			s.handleEvent(event)
-		case err, ok := <-s.errorsChannel:
-			if !ok {
-				return errors.New("errorsChannel closed")
-			}
-			s.handleError(err)
+		case err := <-s.errorsChannel:
+			s.eventSerializer.ReportError(err)
 		}
 	}
 }
@@ -85,14 +82,14 @@ func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
 		s.eventSerializer.BuildErrorEvent(envelope)
 	case events.Envelope_ContainerMetric:
 		appGuIG := envelope.GetContainerMetric().GetApplicationId()
-		appInfo, err := s.fetcher.GetApp(appGuIG)
-		if err != nil && debug {
-			logger.Print("[ERROR]", err)
+		if s.fetcher != nil {
+			appInfo, err := s.fetcher.GetApp(appGuIG)
+			if err != nil && debug {
+				logger.Print("[ERROR]", err)
+			}
+			s.eventSerializer.BuildContainerEvent(envelope, appInfo)
+		} else {
+			logger.Println("***********")
 		}
-		s.eventSerializer.BuildContainerEvent(envelope, appInfo)
 	}
-}
-
-func (s *forwardingNozzle) handleError(err error) {
-	logger.Printf("Error from firehose - %v", err)
 }
