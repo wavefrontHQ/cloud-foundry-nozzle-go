@@ -11,25 +11,22 @@ var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
 var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
 // Nozzle will read all CF events and sent it to the Forwarder
-type Nozzle interface {
-	SetAPIClient(*APIClient)
-}
+type Nozzle struct {
+	EventsChannel chan *events.Envelope
+	ErrorsChannel chan error
+	APIClient     *APIClient
 
-type forwardingNozzle struct {
-	eventSerializer    EventHandler
+	eventSerializer    *EventHandler
 	includedEventTypes map[events.Envelope_EventType]bool
-	eventsChannel      <-chan *events.Envelope
-	errorsChannel      <-chan error
 	appsInfo           map[string]*AppInfo
-	fetcher            *APIClient
 }
 
 // NewNozzle create a new Nozzle
-func NewNozzle(eventSerializer EventHandler, selectedEventTypes []events.Envelope_EventType, eventsChannel <-chan *events.Envelope, errors <-chan error) Nozzle {
-	nozzle := &forwardingNozzle{
-		eventSerializer: eventSerializer,
-		eventsChannel:   eventsChannel,
-		errorsChannel:   errors,
+func NewNozzle(conf *Config) *Nozzle {
+	nozzle := &Nozzle{
+		eventSerializer: CreateEventHandler(conf.Wavefront),
+		EventsChannel:   make(chan *events.Envelope, 1000),
+		ErrorsChannel:   make(chan error),
 	}
 
 	nozzle.includedEventTypes = map[events.Envelope_EventType]bool{
@@ -40,7 +37,7 @@ func NewNozzle(eventSerializer EventHandler, selectedEventTypes []events.Envelop
 		events.Envelope_Error:           false,
 		events.Envelope_ContainerMetric: false,
 	}
-	for _, selectedEventType := range selectedEventTypes {
+	for _, selectedEventType := range conf.Nozzle.SelectedEvents {
 		nozzle.includedEventTypes[selectedEventType] = true
 	}
 
@@ -48,48 +45,38 @@ func NewNozzle(eventSerializer EventHandler, selectedEventTypes []events.Envelop
 	return nozzle
 }
 
-func (s *forwardingNozzle) SetAPIClient(api *APIClient) {
-	s.fetcher = api
-}
-
-func (s *forwardingNozzle) run() {
+func (s *Nozzle) run() {
 	for {
 		select {
-		case event := <-s.eventsChannel:
+		case event := <-s.EventsChannel:
 			s.handleEvent(event)
-		case err := <-s.errorsChannel:
+		case err := <-s.ErrorsChannel:
 			s.eventSerializer.ReportError(err)
 		}
 	}
 }
 
-func (s *forwardingNozzle) handleEvent(envelope *events.Envelope) {
+func (s *Nozzle) handleEvent(envelope *events.Envelope) {
 	eventType := envelope.GetEventType()
 	if !s.includedEventTypes[eventType] {
 		return
 	}
 
 	switch eventType {
-	case events.Envelope_HttpStartStop:
-		s.eventSerializer.BuildHTTPStartStopEvent(envelope)
-	case events.Envelope_LogMessage:
-		s.eventSerializer.BuildLogMessageEvent(envelope)
 	case events.Envelope_ValueMetric:
 		s.eventSerializer.BuildValueMetricEvent(envelope)
 	case events.Envelope_CounterEvent:
 		s.eventSerializer.BuildCounterEvent(envelope)
-	case events.Envelope_Error:
-		s.eventSerializer.BuildErrorEvent(envelope)
 	case events.Envelope_ContainerMetric:
 		appGuIG := envelope.GetContainerMetric().GetApplicationId()
-		if s.fetcher != nil {
-			appInfo, err := s.fetcher.GetApp(appGuIG)
+		if s.APIClient != nil {
+			appInfo, err := s.APIClient.GetApp(appGuIG)
 			if err != nil && debug {
 				logger.Print("[ERROR]", err)
 			}
 			s.eventSerializer.BuildContainerEvent(envelope, appInfo)
 		} else {
-			logger.Println("***********")
+			logger.Fatal("[ERROR] APIClient is null")
 		}
 	}
 }

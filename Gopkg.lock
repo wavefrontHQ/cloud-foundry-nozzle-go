@@ -242,8 +242,10 @@
   input-imports = [
     "github.com/cloudfoundry-community/go-cfclient",
     "github.com/cloudfoundry/noaa/consumer",
+    "github.com/cloudfoundry/noaa/errors",
     "github.com/cloudfoundry/sonde-go/events",
     "github.com/gobwas/glob",
+    "github.com/gorilla/websocket",
     "github.com/kelseyhightower/envconfig",
     "github.com/patrickmn/go-cache",
     "github.com/rcrowley/go-metrics",

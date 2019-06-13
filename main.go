@@ -8,37 +8,32 @@ import (
 
 	"github.com/cloudfoundry/noaa/consumer"
 	noaaerrors "github.com/cloudfoundry/noaa/errors"
-	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gorilla/websocket"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
+	wfnozzle "github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
 )
 
 var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
 var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
 func main() {
-	conf, err := nozzle.ParseConfig()
+	conf, err := wfnozzle.ParseConfig()
 	if err != nil {
 		logger.Fatal("[ERROR] Unable to build config from environment: ", err)
 	}
 	logger.Printf("Forwarding events: %s", conf.Nozzle.SelectedEvents)
 
-	eventsBuff := make(chan *events.Envelope, 1000)
-	errsBuff := make(chan error)
-	wavefront := nozzle.CreateEventHandler(conf.Wavefront)
-	forwarder := nozzle.NewNozzle(wavefront, conf.Nozzle.SelectedEvents, eventsBuff, errsBuff)
+	nozzle := wfnozzle.NewNozzle(conf)
 
 	for {
 		var trafficControllerURL string
 		logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
 
-		// Set up connection to PAS API using the token we got
-		api, err := nozzle.NewAPIClient(conf.Nozzle)
+		api, err := wfnozzle.NewAPIClient(conf.Nozzle)
 		if err != nil {
 			logger.Fatal("[ERROR] Unable to build API client: ", err)
 		}
 
-		forwarder.SetAPIClient(api)
+		nozzle.APIClient = api
 
 		token, err := api.FetchAuthToken()
 		if err != nil {
@@ -60,38 +55,32 @@ func main() {
 		go func() {
 			for {
 				select {
-				case event, ok := <-events:
-					if ok {
-						eventsBuff <- event
-					} else {
-						logger.Printf("eventsChannel channel closed")
-					}
+				case event := <-events:
+					nozzle.EventsChannel <- event
 				case err := <-errs:
-					if retryErr, ok := err.(noaaerrors.RetryError); ok {
-						err = retryErr.Err
-					}
-
-					switch closeErr := err.(type) {
-					case *websocket.CloseError:
-						logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
-					default:
-						logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
-					}
-					errsBuff <- err
+					printError(err)
+					nozzle.ErrorsChannel <- err
 					close(done)
 					return
 				}
 			}
 		}()
 		<-done
+
 		noaaConsumer.Close()
 		logger.Println("Reconecting.")
 	}
 }
 
-type loggerDebugPrinter struct {
-}
+func printError(err error) {
+	if retryErr, ok := err.(noaaerrors.RetryError); ok {
+		err = retryErr.Err
+	}
 
-func (loggerDebugPrinter) Print(title, body string) {
-	logger.Printf("[%s] %s", title, body)
+	switch closeErr := err.(type) {
+	case *websocket.CloseError:
+		logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
+	default:
+		logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
+	}
 }

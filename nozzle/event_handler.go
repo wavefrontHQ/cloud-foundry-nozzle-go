@@ -17,17 +17,7 @@ import (
 var trace = os.Getenv("WAVEFRONT_TRACE") == "true"
 
 // EventHandler receive CF events and send metrics to WF
-type EventHandler interface {
-	BuildHTTPStartStopEvent(event *events.Envelope)
-	BuildLogMessageEvent(event *events.Envelope)
-	BuildValueMetricEvent(event *events.Envelope)
-	BuildCounterEvent(event *events.Envelope)
-	BuildErrorEvent(event *events.Envelope)
-	BuildContainerEvent(event *events.Envelope, appInfo *AppInfo)
-	ReportError(err error)
-}
-
-type eventHandlerImpl struct {
+type EventHandler struct {
 	sender     senders.Sender
 	reporter   reporting.WavefrontMetricsReporter
 	prefix     string
@@ -43,7 +33,7 @@ type eventHandlerImpl struct {
 }
 
 // CreateEventHandler create a new EventHandler
-func CreateEventHandler(conf *WavefrontConfig) EventHandler {
+func CreateEventHandler(conf *WavefrontConfig) *EventHandler {
 	var sender senders.Sender
 	var err error
 
@@ -110,7 +100,7 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	numContainerMetricReceived := newCounter("container-metric-received", internalTags)
 	handleErrorMetric := newCounter("firehose-connection-error", internalTags)
 
-	return &eventHandlerImpl{
+	return &EventHandler{
 		sender:                     sender,
 		reporter:                   reporter,
 		prefix:                     strings.Trim(conf.Prefix, " "),
@@ -129,13 +119,8 @@ func newCounter(name string, tags map[string]string) metrics.Counter {
 	return reporting.GetOrRegisterMetric(name, metrics.NewCounter(), tags).(metrics.Counter)
 }
 
-func (w *eventHandlerImpl) BuildHTTPStartStopEvent(event *events.Envelope) {
-}
-
-func (w *eventHandlerImpl) BuildLogMessageEvent(event *events.Envelope) {
-}
-
-func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
+//BuildValueMetricEvent parse and report metrics
+func (w *EventHandler) BuildValueMetricEvent(event *events.Envelope) {
 	w.numValueMetricReceived.Inc(1)
 
 	metricName := w.prefix
@@ -149,7 +134,8 @@ func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
 	w.sendMetric(metricName, value, ts, source, tags)
 }
 
-func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
+//BuildCounterEvent parse and report metrics
+func (w *EventHandler) BuildCounterEvent(event *events.Envelope) {
 	w.numCounterEventReceived.Inc(1)
 
 	metricName := w.prefix
@@ -164,10 +150,8 @@ func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
 	w.sendMetric(metricName+".delta", float64(delta), ts, source, tags)
 }
 
-func (w *eventHandlerImpl) BuildErrorEvent(event *events.Envelope) {
-}
-
-func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *AppInfo) {
+//BuildContainerEvent parse and report metrics
+func (w *EventHandler) BuildContainerEvent(event *events.Envelope, appInfo *AppInfo) {
 	w.numContainerMetricReceived.Inc(1)
 
 	metricName := w.prefix + ".container." + event.GetOrigin()
@@ -194,14 +178,14 @@ func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *
 	w.sendMetric(metricName+".memory_bytes_quota", float64(memoryBytesQuota), ts, source, tags)
 }
 
-func (w *eventHandlerImpl) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
+func (w *EventHandler) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
 	source := w.getSource(event)
 	tags := w.getTags(event)
 
 	return source, tags, event.GetTimestamp()
 }
 
-func (w *eventHandlerImpl) getSource(event *events.Envelope) string {
+func (w *EventHandler) getSource(event *events.Envelope) string {
 	source := event.GetIp()
 	if len(source) == 0 {
 		source = event.GetJob()
@@ -217,7 +201,7 @@ func (w *eventHandlerImpl) getSource(event *events.Envelope) string {
 	return source
 }
 
-func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
+func (w *EventHandler) getTags(event *events.Envelope) map[string]string {
 	tags := make(map[string]string)
 
 	if deployment := event.GetDeployment(); len(deployment) > 0 {
@@ -237,7 +221,7 @@ func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
 	return tags
 }
 
-func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
+func (w *EventHandler) sendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
 	if trace {
 		line, err := senders.MetricLine(name, value, ts, source, tags, "")
 		if err != nil {
@@ -262,6 +246,7 @@ func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, sour
 	}
 }
 
-func (w *eventHandlerImpl) ReportError(err error) {
+//ReportError incremets the error counter
+func (w *EventHandler) ReportError(err error) {
 	w.handleErrorMetric.Inc(1)
 }
