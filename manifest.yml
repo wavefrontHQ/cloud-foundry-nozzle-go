@@ -18,5 +18,5 @@ applications:
 
     WAVEFRONT_URL: https://......wavefront.com
     WAVEFRONT_API_TOKEN: .........
-    WAVEFRONT_FLUSH_INTERVAL: 15
+    WAVEFRONT_FLUSH_INTERVAL: 1
     WAVEFRONT_PREFIX: pcf
