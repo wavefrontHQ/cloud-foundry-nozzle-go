@@ -85,7 +85,7 @@ func main() {
 		}()
 		<-done
 		noaaConsumer.Close()
-		logger.Println("Reconecting.")
+		logger.Println("Reconnecting")
 	}
 }
 

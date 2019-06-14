@@ -56,8 +56,8 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 		directCfg := &senders.DirectConfiguration{
 			Server:               strings.Trim(conf.URL, " "),
 			Token:                strings.Trim(conf.Token, " "),
-			BatchSize:            10000,
-			MaxBufferSize:        50000,
+			BatchSize:            conf.BatchSize,
+			MaxBufferSize:        conf.MaxBufferSize,
 			FlushIntervalSeconds: conf.FlushInterval,
 		}
 		sender, err = senders.NewDirectSender(directCfg)
@@ -233,7 +233,6 @@ func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
 	for k, v := range event.GetTags() {
 		tags[k] = v
 	}
-
 	return tags
 }
 
@@ -255,7 +254,9 @@ func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, sour
 		err := w.sender.SendMetric(name, value, ts, source, tags)
 		if err != nil {
 			w.metricsSendFailure.Inc(1)
-			logger.Printf("[ERROR] error sending the metric '%s': %v", name, err)
+			if debug {
+				logger.Printf("[ERROR] error sending the metric '%s': %v", name, err)
+			}
 		} else {
 			w.numMetricsSent.Inc(1)
 		}
