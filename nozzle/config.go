@@ -41,7 +41,7 @@ type WavefrontConfig struct {
 	Token         string `envconfig:"API_TOKEN"`
 	ProxyAddr     string `envconfig:"PROXY_ADDR"`
 	ProxyPort     int    `envconfig:"PROXY_PORT"`
-	FlushInterval int    `default:"5" envconfig:"FLUSH_INTERVAL"`
+	FlushInterval int    `default:"1" envconfig:"FLUSH_INTERVAL"`
 	MaxBufferSize int    `default:"100000" envconfig:"MAX_BUFFER_SIZE"`
 	BatchSize     int    `default:"10000" envconfig:"BATCH_SIZE"`
 	Prefix        string `required:"true" envconfig:"PREFIX"`
