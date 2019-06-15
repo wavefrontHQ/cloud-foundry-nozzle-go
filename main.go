@@ -28,18 +28,18 @@ func main() {
 	wavefront := nozzle.CreateEventHandler(conf.Wavefront)
 	forwarder := nozzle.NewNozzle(wavefront, conf.Nozzle.SelectedEvents, eventsBuff, errsBuff)
 
+	var trafficControllerURL string
+	logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
+
+	// Set up connection to PAS API using the token we got
+	api, err := nozzle.NewAPIClient(conf.Nozzle)
+	if err != nil {
+		logger.Fatal("[ERROR] Unable to build API client: ", err)
+	}
+
+	forwarder.SetAPIClient(api)
+
 	for {
-		var trafficControllerURL string
-		logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
-
-		// Set up connection to PAS API using the token we got
-		api, err := nozzle.NewAPIClient(conf.Nozzle)
-		if err != nil {
-			logger.Fatal("[ERROR] Unable to build API client: ", err)
-		}
-
-		forwarder.SetAPIClient(api)
-
 		token, err := api.FetchAuthToken()
 		if err != nil {
 			logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
