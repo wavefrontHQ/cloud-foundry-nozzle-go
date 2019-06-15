@@ -77,20 +77,7 @@ func CreateEventHandler(conf *WavefrontConfig) *EventHandler {
 		reporting.Prefix("wavefront-firehose-nozzle.app"),
 	)
 
-	internalTags := map[string]string{
-		"foundation":               conf.Foundation,
-		"firehose-subscription-id": os.Getenv("NOZZLE_FIREHOSE_SUBSCRIPTION_ID"),
-	}
-
-	app, err := GetVcapApp()
-	if err == nil {
-		internalTags["application_id"] = app.ID
-		internalTags["application_idx"] = fmt.Sprint(app.Idx)
-		internalTags["application_name"] = app.Name
-	} else {
-		logger.Printf("[ERROR] %v", err)
-	}
-
+	internalTags := GetInternalTags()
 	logger.Printf("internalTags: %v", internalTags)
 
 	numMetricsSent := newCounter("total-metrics-sent", internalTags)
@@ -158,7 +145,7 @@ func (w *EventHandler) BuildContainerEvent(event *events.Envelope, appInfo *AppI
 	source, tags, ts := w.getMetricInfo(event)
 
 	tags["applicationId"] = event.GetContainerMetric().GetApplicationId()
-	tags["instanceIndex"] = string(event.GetContainerMetric().GetInstanceIndex())
+	tags["instanceIndex"] = fmt.Sprintf("%d", event.GetContainerMetric().GetInstanceIndex())
 	if appInfo != nil {
 		tags["applicationName"] = appInfo.Name
 		tags["space"] = appInfo.Space

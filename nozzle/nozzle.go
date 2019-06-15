@@ -3,8 +3,11 @@ package nozzle
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/cloudfoundry/sonde-go/events"
+	metrics "github.com/rcrowley/go-metrics"
+	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
@@ -41,8 +44,14 @@ func NewNozzle(conf *Config) *Nozzle {
 		nozzle.includedEventTypes[selectedEventType] = true
 	}
 
+	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(nozzle.queueSize), GetInternalTags())
+
 	go nozzle.run()
 	return nozzle
+}
+
+func (s *Nozzle) queueSize() int64 {
+	return int64(len(s.EventsChannel))
 }
 
 func (s *Nozzle) run() {
