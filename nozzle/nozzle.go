@@ -4,7 +4,10 @@ import (
 	"log"
 	"os"
 
+	metrics "github.com/rcrowley/go-metrics"
+
 	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
@@ -44,12 +47,18 @@ func NewNozzle(eventSerializer EventHandler, selectedEventTypes []events.Envelop
 		nozzle.includedEventTypes[selectedEventType] = true
 	}
 
+	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(nozzle.queueSize), GetInternalTags())
+
 	go nozzle.run()
 	return nozzle
 }
 
 func (s *forwardingNozzle) SetAPIClient(api *APIClient) {
 	s.fetcher = api
+}
+
+func (s *forwardingNozzle) queueSize() int64 {
+	return int64(len(s.eventsChannel))
 }
 
 func (s *forwardingNozzle) run() {

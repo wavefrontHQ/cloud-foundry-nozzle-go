@@ -2,7 +2,6 @@ package nozzle
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 
@@ -87,20 +86,7 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 		reporting.Prefix("wavefront-firehose-nozzle.app"),
 	)
 
-	internalTags := map[string]string{
-		"foundation":               conf.Foundation,
-		"firehose-subscription-id": os.Getenv("NOZZLE_FIREHOSE_SUBSCRIPTION_ID"),
-	}
-
-	app, err := GetVcapApp()
-	if err == nil {
-		internalTags["application_id"] = app.ID
-		internalTags["application_idx"] = fmt.Sprint(app.Idx)
-		internalTags["application_name"] = app.Name
-	} else {
-		logger.Printf("[ERROR] %v", err)
-	}
-
+	internalTags := GetInternalTags()
 	logger.Printf("internalTags: %v", internalTags)
 
 	numMetricsSent := newCounter("total-metrics-sent", internalTags)

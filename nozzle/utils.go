@@ -27,3 +27,21 @@ func GetVcapApp() (VCAPAplication, error) {
 	}
 	return app, nil
 }
+
+// GetInternalTags return tags for internal metrics
+func GetInternalTags() map[string]string {
+	internalTags := map[string]string{
+		"foundation":               os.Getenv("WAVEFRONT_FOUNDATION"),
+		"firehose-subscription-id": os.Getenv("NOZZLE_FIREHOSE_SUBSCRIPTION_ID"),
+	}
+
+	app, err := GetVcapApp()
+	if err == nil {
+		internalTags["application_id"] = app.ID
+		internalTags["application_idx"] = fmt.Sprint(app.Idx)
+		internalTags["application_name"] = app.Name
+	} else {
+		logger.Printf("[ERROR] %v", err)
+	}
+	return internalTags
+}
