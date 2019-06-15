@@ -2,6 +2,7 @@ package nozzle
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -160,7 +161,7 @@ func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *
 	source, tags, ts := w.getMetricInfo(event)
 
 	tags["applicationId"] = event.GetContainerMetric().GetApplicationId()
-	tags["instanceIndex"] = string(event.GetContainerMetric().GetInstanceIndex())
+	tags["instanceIndex"] = fmt.Sprintf("%d", event.GetContainerMetric().GetInstanceIndex())
 	if appInfo != nil {
 		tags["applicationName"] = appInfo.Name
 		tags["space"] = appInfo.Space
