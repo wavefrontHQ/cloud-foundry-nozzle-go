@@ -36,7 +36,7 @@ type WavefrontConfig struct {
 	Token         string `envconfig:"API_TOKEN"`
 	ProxyAddr     string `envconfig:"PROXY_ADDR"`
 	ProxyPort     int    `envconfig:"PROXY_PORT"`
-	FlushInterval int    `default:"5" envconfig:"FLUSH_INTERVAL"`
+	FlushInterval int    `default:"15" envconfig:"FLUSH_INTERVAL"`
 	Prefix        string `required:"true" envconfig:"PREFIX"`
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
 
