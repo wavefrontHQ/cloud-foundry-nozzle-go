@@ -106,6 +106,30 @@ func TestEmptyIndexed(t *testing.T) {
 	assert.Equal(t, 0, len(config.Wavefront.Filters.MetricsTagBlackList))
 }
 
+func TestSelectedEvents(t *testing.T) {
+	os.Clearenv()
+	selectedEvents, err := nozzle.ParseSelectedEvents()
+	assert.Nil(t, err, "error: %v", err)
+	assert.Equal(t, 3, len(selectedEvents), selectedEvents)
+
+	os.Clearenv()
+	os.Setenv("NOZZLE_SELECTED_EVENTS", "ValueMetric,CounterEvent")
+	selectedEvents, err = nozzle.ParseSelectedEvents()
+	assert.Nil(t, err, "error: %v", err)
+	assert.Equal(t, 2, len(selectedEvents), selectedEvents)
+
+	os.Clearenv()
+	os.Setenv("NOZZLE_SELECTED_EVENTS", "[ValueMetric ContainerMetric]")
+	selectedEvents, err = nozzle.ParseSelectedEvents()
+	assert.Nil(t, err, "error: %v", err)
+	assert.Equal(t, 2, len(selectedEvents), selectedEvents)
+
+	os.Clearenv()
+	os.Setenv("NOZZLE_SELECTED_EVENTS", "[ValueMetric Contai__nerMetric]")
+	selectedEvents, err = nozzle.ParseSelectedEvents()
+	assert.NotNil(t, err)
+}
+
 func contains(a []string, x string) bool {
 	for _, n := range a {
 		if x == n {

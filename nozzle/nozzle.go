@@ -3,7 +3,6 @@ package nozzle
 import (
 	"log"
 	"os"
-	"time"
 
 	"github.com/cloudfoundry/sonde-go/events"
 	metrics "github.com/rcrowley/go-metrics"

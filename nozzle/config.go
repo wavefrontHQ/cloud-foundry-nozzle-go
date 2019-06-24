@@ -57,6 +57,7 @@ type filtersConfig struct {
 var defaultEvents = []events.Envelope_EventType{
 	events.Envelope_ValueMetric,
 	events.Envelope_CounterEvent,
+	events.Envelope_ContainerMetric,
 }
 
 // ParseConfig reads users provided env variables and create a Config
@@ -72,7 +73,7 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
-	selectedEvents, err := parseSelectedEvents()
+	selectedEvents, err := ParseSelectedEvents()
 	if err != nil {
 		return nil, err
 	}
@@ -118,20 +119,26 @@ func parseIndexedVars(varName string) {
 	}
 }
 
-func parseSelectedEvents() ([]events.Envelope_EventType, error) {
-	envValue := os.Getenv("NOZZLE_SELECTED_EVENTS")
+// ParseSelectedEvents get the Selected Events from the env
+func ParseSelectedEvents() ([]events.Envelope_EventType, error) {
+	orgEnvValue := os.Getenv("NOZZLE_SELECTED_EVENTS")
+	envValue := strings.Trim(orgEnvValue, "[]")
 	if envValue == "" {
 		return defaultEvents, nil
 	}
 
 	selectedEvents := []events.Envelope_EventType{}
-	for _, envValueSplit := range strings.Split(envValue, ",") {
+	sep := " "
+	if strings.Contains(envValue, ",") {
+		sep = ","
+	}
+	for _, envValueSplit := range strings.Split(envValue, sep) {
 		envValueSlitTrimmed := strings.TrimSpace(envValueSplit)
 		val, found := events.Envelope_EventType_value[envValueSlitTrimmed]
 		if found {
 			selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
 		} else {
-			return nil, fmt.Errorf("[%s] is not a valid event type", envValueSlitTrimmed)
+			return nil, fmt.Errorf("[%s] is not a valid event type", orgEnvValue)
 		}
 	}
 
