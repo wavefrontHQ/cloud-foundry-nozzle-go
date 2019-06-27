@@ -130,6 +130,30 @@ func TestSelectedEvents(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+func TestProxySelector(t *testing.T) {
+	os.Clearenv()
+	setUpFooEnv()
+	os.Setenv("NOZZLE_PROXY_SELECTOR", `{"value":"custom","selected_option":{"custom_wf_proxy_addr":"8.8.8.8","custom_wf_proxy_port":1234}}`)
+
+	cfg, err := nozzle.ParseConfig()
+	if err != nil {
+		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
+	}
+	assert.Equal(t, "8.8.8.8", cfg.Wavefront.ProxyAddr)
+	assert.Equal(t, 1234, cfg.Wavefront.ProxyPort)
+
+	os.Clearenv()
+	setUpFooEnv()
+	os.Setenv("NOZZLE_PROXY_SELECTOR", `{"value":"default","selected_option":{}}`)
+
+	cfg, err = nozzle.ParseConfig()
+	if err != nil {
+		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
+	}
+	assert.Equal(t, "", cfg.Wavefront.ProxyAddr)
+	assert.Equal(t, 0, cfg.Wavefront.ProxyPort)
+}
+
 func contains(a []string, x string) bool {
 	for _, n := range a {
 		if x == n {

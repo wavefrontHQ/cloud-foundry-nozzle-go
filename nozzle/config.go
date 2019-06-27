@@ -1,6 +1,7 @@
 package nozzle
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -28,6 +29,8 @@ type NozzleConfig struct {
 	AppCacheSize       int           `split_words:"true" default:"50000"`
 
 	SelectedEvents []events.Envelope_EventType `ignored:"true"`
+
+	CustomProxy proxyInfo `envconfig:"NOZZLE_PROXY_SELECTOR"`
 }
 
 // WavefrontConfig holds specific Wavefront env variables
@@ -41,6 +44,32 @@ type WavefrontConfig struct {
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
 
 	Filters *Filters `ignored:"true"`
+}
+
+// CustomProxyConfig holds info about the user proxy
+type customProxyConfig struct {
+	Value string    `json:"value"`
+	Proxy proxyInfo `json:"selected_option"`
+}
+
+// ProxyInfo custom proxy info
+type proxyInfo struct {
+	Address string `json:"custom_wf_proxy_addr"`
+	Port    int    `json:"custom_wf_proxy_port"`
+}
+
+// Decode json
+func (cpc *proxyInfo) Decode(value string) error {
+	var config customProxyConfig
+	err := json.Unmarshal([]byte(value), &config)
+	if err == nil {
+		*cpc = config.Proxy
+	}
+	return err
+}
+
+func (cpc *proxyInfo) Valid() bool {
+	return cpc.Port > 0 && len(cpc.Address) > 0
 }
 
 type filtersConfig struct {
@@ -83,6 +112,11 @@ func ParseConfig() (*Config, error) {
 	err = envconfig.Process("wavefront", wavefrontConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	if nozzleConfig.CustomProxy.Valid() {
+		wavefrontConfig.ProxyAddr = nozzleConfig.CustomProxy.Address
+		wavefrontConfig.ProxyPort = nozzleConfig.CustomProxy.Port
 	}
 
 	f := &filtersConfig{}
