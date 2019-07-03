@@ -27,7 +27,7 @@ type EventHandler struct {
 
 	numMetricsSent             metrics.Counter
 	metricsSendFailure         metrics.Counter
-	metricsDropped             metrics.Counter
+	metricsFiltered            metrics.Counter
 	numValueMetricReceived     metrics.Counter
 	numCounterEventReceived    metrics.Counter
 	numContainerMetricReceived metrics.Counter
@@ -84,7 +84,7 @@ func CreateEventHandler(conf *WavefrontConfig) *EventHandler {
 
 	numMetricsSent := newCounter("total-metrics-sent", internalTags)
 	metricsSendFailure := newCounter("metrics-send-failure", internalTags)
-	metricsDropped := newCounter("metrics-filtered", internalTags)
+	metricsFiltered := newCounter("metrics-filtered", internalTags)
 	numValueMetricReceived := newCounter("value-metric-received", internalTags)
 	numCounterEventReceived := newCounter("counter-event-received", internalTags)
 	numContainerMetricReceived := newCounter("container-metric-received", internalTags)
@@ -98,7 +98,7 @@ func CreateEventHandler(conf *WavefrontConfig) *EventHandler {
 		filter:                     NewGlobFilter(conf.Filters),
 		numMetricsSent:             numMetricsSent,
 		metricsSendFailure:         metricsSendFailure,
-		metricsDropped:             metricsDropped,
+		metricsFiltered:            metricsFiltered,
 		numValueMetricReceived:     numValueMetricReceived,
 		numCounterEventReceived:    numCounterEventReceived,
 		numContainerMetricReceived: numContainerMetricReceived,
@@ -238,7 +238,7 @@ func (w *EventHandler) sendMetric(name string, value float64, ts int64, source s
 			w.numMetricsSent.Inc(1)
 		}
 	} else {
-		w.metricsDropped.Inc(1)
+		w.metricsFiltered.Inc(1)
 	}
 }
 
@@ -251,7 +251,7 @@ func (w *EventHandler) startHealthReport() {
 	ticker := time.NewTicker(time.Minute)
 	go func() {
 		for range ticker.C {
-			logger.Printf("total metrics sent: %d  filtered: %d  failures: %d", w.numMetricsSent.Count(), w.metricsDropped.Count(), w.metricsSendFailure.Count())
+			logger.Printf("total metrics sent: %d  filtered: %d  failures: %d", w.numMetricsSent.Count(), w.metricsFiltered.Count(), w.metricsSendFailure.Count())
 		}
 	}()
 }
