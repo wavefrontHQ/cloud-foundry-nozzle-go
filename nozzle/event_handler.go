@@ -2,7 +2,10 @@ package nozzle
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	metrics "github.com/rcrowley/go-metrics"
 
@@ -12,17 +15,10 @@ import (
 	"github.com/wavefronthq/wavefront-sdk-go/senders"
 )
 
-// EventHandler receive CF events and send metrics to WF
-type EventHandler interface {
-	BuildHTTPStartStopEvent(event *events.Envelope)
-	BuildLogMessageEvent(event *events.Envelope)
-	BuildValueMetricEvent(event *events.Envelope)
-	BuildCounterEvent(event *events.Envelope)
-	BuildErrorEvent(event *events.Envelope)
-	BuildContainerEvent(event *events.Envelope, appInfo *AppInfo)
-}
+var trace = os.Getenv("WAVEFRONT_TRACE") == "true"
 
-type eventHandlerImpl struct {
+// EventHandler receive CF events and send metrics to WF
+type EventHandler struct {
 	sender     senders.Sender
 	reporter   reporting.WavefrontMetricsReporter
 	prefix     string
@@ -31,13 +27,15 @@ type eventHandlerImpl struct {
 
 	numMetricsSent             metrics.Counter
 	metricsSendFailure         metrics.Counter
+	metricsFiltered            metrics.Counter
 	numValueMetricReceived     metrics.Counter
 	numCounterEventReceived    metrics.Counter
 	numContainerMetricReceived metrics.Counter
+	handleErrorMetric          metrics.Counter
 }
 
 // CreateEventHandler create a new EventHandler
-func CreateEventHandler(conf *WavefrontConfig) EventHandler {
+func CreateEventHandler(conf *WavefrontConfig) *EventHandler {
 	var sender senders.Sender
 	var err error
 
@@ -48,10 +46,10 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	if len(conf.URL) > 0 && len(conf.Token) > 0 {
 		logger.Printf("Direct connetion to Wavefront: %s", conf.URL)
 		directCfg := &senders.DirectConfiguration{
-			Server:               conf.URL,
-			Token:                conf.Token,
-			BatchSize:            10000,
-			MaxBufferSize:        50000,
+			Server:               strings.Trim(conf.URL, " "),
+			Token:                strings.Trim(conf.Token, " "),
+			BatchSize:            conf.BatchSize,
+			MaxBufferSize:        conf.MaxBufferSize,
 			FlushIntervalSeconds: conf.FlushInterval,
 		}
 		sender, err = senders.NewDirectSender(directCfg)
@@ -61,7 +59,7 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 	} else if len(conf.ProxyAddr) > 0 && conf.ProxyPort > 0 {
 		logger.Printf("Connecting to Wavefront proxy: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
 		proxyCfg := &senders.ProxyConfiguration{
-			Host:                 conf.ProxyAddr,
+			Host:                 strings.Trim(conf.ProxyAddr, " "),
 			MetricsPort:          conf.ProxyPort,
 			FlushIntervalSeconds: conf.FlushInterval,
 		}
@@ -81,33 +79,41 @@ func CreateEventHandler(conf *WavefrontConfig) EventHandler {
 		reporting.Prefix("wavefront-firehose-nozzle.app"),
 	)
 
-	numMetricsSent := metrics.GetOrRegisterCounter("total-metrics-sent", nil)
-	metricsSendFailure := metrics.GetOrRegisterCounter("metrics-send-failure", nil)
-	numValueMetricReceived := metrics.GetOrRegisterCounter("value-metric-received", nil)
-	numCounterEventReceived := metrics.GetOrRegisterCounter("counter-event-received", nil)
-	numContainerMetricReceived := metrics.GetOrRegisterCounter("container-metric-received", nil)
+	internalTags := GetInternalTags()
+	logger.Printf("internalTags: %v", internalTags)
 
-	return &eventHandlerImpl{
+	numMetricsSent := newCounter("total-metrics-sent", internalTags)
+	metricsSendFailure := newCounter("metrics-send-failure", internalTags)
+	metricsFiltered := newCounter("metrics-filtered", internalTags)
+	numValueMetricReceived := newCounter("value-metric-received", internalTags)
+	numCounterEventReceived := newCounter("counter-event-received", internalTags)
+	numContainerMetricReceived := newCounter("container-metric-received", internalTags)
+	handleErrorMetric := newCounter("firehose-connection-error", internalTags)
+
+	ev := &EventHandler{
 		sender:                     sender,
 		reporter:                   reporter,
-		prefix:                     conf.Prefix,
-		foundation:                 conf.Foundation,
+		prefix:                     strings.Trim(conf.Prefix, " "),
+		foundation:                 strings.Trim(conf.Foundation, " "),
 		filter:                     NewGlobFilter(conf.Filters),
 		numMetricsSent:             numMetricsSent,
 		metricsSendFailure:         metricsSendFailure,
+		metricsFiltered:            metricsFiltered,
 		numValueMetricReceived:     numValueMetricReceived,
 		numCounterEventReceived:    numCounterEventReceived,
 		numContainerMetricReceived: numContainerMetricReceived,
+		handleErrorMetric:          handleErrorMetric,
 	}
+	ev.startHealthReport()
+	return ev
 }
 
-func (w *eventHandlerImpl) BuildHTTPStartStopEvent(event *events.Envelope) {
+func newCounter(name string, tags map[string]string) metrics.Counter {
+	return reporting.GetOrRegisterMetric(name, metrics.NewCounter(), tags).(metrics.Counter)
 }
 
-func (w *eventHandlerImpl) BuildLogMessageEvent(event *events.Envelope) {
-}
-
-func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
+//BuildValueMetricEvent parse and report metrics
+func (w *EventHandler) BuildValueMetricEvent(event *events.Envelope) {
 	w.numValueMetricReceived.Inc(1)
 
 	metricName := w.prefix
@@ -121,7 +127,8 @@ func (w *eventHandlerImpl) BuildValueMetricEvent(event *events.Envelope) {
 	w.sendMetric(metricName, value, ts, source, tags)
 }
 
-func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
+//BuildCounterEvent parse and report metrics
+func (w *EventHandler) BuildCounterEvent(event *events.Envelope) {
 	w.numCounterEventReceived.Inc(1)
 
 	metricName := w.prefix
@@ -136,17 +143,15 @@ func (w *eventHandlerImpl) BuildCounterEvent(event *events.Envelope) {
 	w.sendMetric(metricName+".delta", float64(delta), ts, source, tags)
 }
 
-func (w *eventHandlerImpl) BuildErrorEvent(event *events.Envelope) {
-}
-
-func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *AppInfo) {
+//BuildContainerEvent parse and report metrics
+func (w *EventHandler) BuildContainerEvent(event *events.Envelope, appInfo *AppInfo) {
 	w.numContainerMetricReceived.Inc(1)
 
 	metricName := w.prefix + ".container." + event.GetOrigin()
 	source, tags, ts := w.getMetricInfo(event)
 
 	tags["applicationId"] = event.GetContainerMetric().GetApplicationId()
-	tags["instanceIndex"] = string(event.GetContainerMetric().GetInstanceIndex())
+	tags["instanceIndex"] = fmt.Sprintf("%d", event.GetContainerMetric().GetInstanceIndex())
 	if appInfo != nil {
 		tags["applicationName"] = appInfo.Name
 		tags["space"] = appInfo.Space
@@ -166,14 +171,14 @@ func (w *eventHandlerImpl) BuildContainerEvent(event *events.Envelope, appInfo *
 	w.sendMetric(metricName+".memory_bytes_quota", float64(memoryBytesQuota), ts, source, tags)
 }
 
-func (w *eventHandlerImpl) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
+func (w *EventHandler) getMetricInfo(event *events.Envelope) (string, map[string]string, int64) {
 	source := w.getSource(event)
 	tags := w.getTags(event)
 
 	return source, tags, event.GetTimestamp()
 }
 
-func (w *eventHandlerImpl) getSource(event *events.Envelope) string {
+func (w *EventHandler) getSource(event *events.Envelope) string {
 	source := event.GetIp()
 	if len(source) == 0 {
 		source = event.GetJob()
@@ -189,7 +194,7 @@ func (w *eventHandlerImpl) getSource(event *events.Envelope) string {
 	return source
 }
 
-func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
+func (w *EventHandler) getTags(event *events.Envelope) map[string]string {
 	tags := make(map[string]string)
 
 	if deployment := event.GetDeployment(); len(deployment) > 0 {
@@ -205,18 +210,17 @@ func (w *eventHandlerImpl) getTags(event *events.Envelope) map[string]string {
 	for k, v := range event.GetTags() {
 		tags[k] = v
 	}
-
 	return tags
 }
 
-func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
-	if debug {
+func (w *EventHandler) sendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
+	if trace {
 		line, err := senders.MetricLine(name, value, ts, source, tags, "")
 		if err != nil {
 			logger.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
 		}
 
-		status := "dropped"
+		status := "filtered"
 		if w.filter.Match(name, tags) {
 			status = "accepted"
 		}
@@ -227,9 +231,27 @@ func (w *eventHandlerImpl) sendMetric(name string, value float64, ts int64, sour
 		err := w.sender.SendMetric(name, value, ts, source, tags)
 		if err != nil {
 			w.metricsSendFailure.Inc(1)
-			logger.Printf("[ERROR] error sending the metric '%s': %v", name, err)
+			if debug {
+				logger.Printf("[ERROR] error sending the metric '%s': %v", name, err)
+			}
 		} else {
 			w.numMetricsSent.Inc(1)
 		}
+	} else {
+		w.metricsFiltered.Inc(1)
 	}
+}
+
+//ReportError incremets the error counter
+func (w *EventHandler) ReportError(err error) {
+	w.handleErrorMetric.Inc(1)
+}
+
+func (w *EventHandler) startHealthReport() {
+	ticker := time.NewTicker(time.Minute)
+	go func() {
+		for range ticker.C {
+			logger.Printf("total metrics sent: %d  filtered: %d  failures: %d", w.numMetricsSent.Count(), w.metricsFiltered.Count(), w.metricsSendFailure.Count())
+		}
+	}()
 }

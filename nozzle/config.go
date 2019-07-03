@@ -1,6 +1,7 @@
 package nozzle
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -28,6 +29,8 @@ type NozzleConfig struct {
 	AppCacheSize       int           `split_words:"true" default:"50000"`
 
 	SelectedEvents []events.Envelope_EventType `ignored:"true"`
+
+	CustomProxy proxyInfo `envconfig:"NOZZLE_PROXY_SELECTOR"`
 }
 
 // WavefrontConfig holds specific Wavefront env variables
@@ -37,10 +40,38 @@ type WavefrontConfig struct {
 	ProxyAddr     string `envconfig:"PROXY_ADDR"`
 	ProxyPort     int    `envconfig:"PROXY_PORT"`
 	FlushInterval int    `default:"5" envconfig:"FLUSH_INTERVAL"`
+	MaxBufferSize int    `default:"100000" envconfig:"MAX_BUFFER_SIZE"`
+	BatchSize     int    `default:"10000" envconfig:"BATCH_SIZE"`
 	Prefix        string `required:"true" envconfig:"PREFIX"`
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
 
 	Filters *Filters `ignored:"true"`
+}
+
+// CustomProxyConfig holds info about the user proxy
+type customProxyConfig struct {
+	Value string    `json:"value"`
+	Proxy proxyInfo `json:"selected_option"`
+}
+
+// ProxyInfo custom proxy info
+type proxyInfo struct {
+	Address string `json:"custom_wf_proxy_addr"`
+	Port    int    `json:"custom_wf_proxy_port"`
+}
+
+// Decode json
+func (cpc *proxyInfo) Decode(value string) error {
+	var config customProxyConfig
+	err := json.Unmarshal([]byte(value), &config)
+	if err == nil {
+		*cpc = config.Proxy
+	}
+	return err
+}
+
+func (cpc *proxyInfo) Valid() bool {
+	return cpc.Port > 0 && len(cpc.Address) > 0
 }
 
 type filtersConfig struct {
@@ -57,6 +88,7 @@ type filtersConfig struct {
 var defaultEvents = []events.Envelope_EventType{
 	events.Envelope_ValueMetric,
 	events.Envelope_CounterEvent,
+	events.Envelope_ContainerMetric,
 }
 
 // ParseConfig reads users provided env variables and create a Config
@@ -72,7 +104,7 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
-	selectedEvents, err := parseSelectedEvents()
+	selectedEvents, err := ParseSelectedEvents()
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +114,11 @@ func ParseConfig() (*Config, error) {
 	err = envconfig.Process("wavefront", wavefrontConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	if nozzleConfig.CustomProxy.Valid() {
+		wavefrontConfig.ProxyAddr = nozzleConfig.CustomProxy.Address
+		wavefrontConfig.ProxyPort = nozzleConfig.CustomProxy.Port
 	}
 
 	f := &filtersConfig{}
@@ -118,20 +155,26 @@ func parseIndexedVars(varName string) {
 	}
 }
 
-func parseSelectedEvents() ([]events.Envelope_EventType, error) {
-	envValue := os.Getenv("NOZZLE_SELECTED_EVENTS")
+// ParseSelectedEvents get the Selected Events from the env
+func ParseSelectedEvents() ([]events.Envelope_EventType, error) {
+	orgEnvValue := os.Getenv("NOZZLE_SELECTED_EVENTS")
+	envValue := strings.Trim(orgEnvValue, "[]")
 	if envValue == "" {
 		return defaultEvents, nil
 	}
 
 	selectedEvents := []events.Envelope_EventType{}
-	for _, envValueSplit := range strings.Split(envValue, ",") {
+	sep := " "
+	if strings.Contains(envValue, ",") {
+		sep = ","
+	}
+	for _, envValueSplit := range strings.Split(envValue, sep) {
 		envValueSlitTrimmed := strings.TrimSpace(envValueSplit)
 		val, found := events.Envelope_EventType_value[envValueSlitTrimmed]
 		if found {
 			selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
 		} else {
-			return nil, fmt.Errorf("[%s] is not a valid event type", envValueSlitTrimmed)
+			return nil, fmt.Errorf("[%s] is not a valid event type", orgEnvValue)
 		}
 	}
 
