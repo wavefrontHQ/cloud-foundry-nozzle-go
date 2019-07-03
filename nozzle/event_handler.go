@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	metrics "github.com/rcrowley/go-metrics"
 
@@ -26,6 +27,7 @@ type EventHandler struct {
 
 	numMetricsSent             metrics.Counter
 	metricsSendFailure         metrics.Counter
+	metricsDropped             metrics.Counter
 	numValueMetricReceived     metrics.Counter
 	numCounterEventReceived    metrics.Counter
 	numContainerMetricReceived metrics.Counter
@@ -82,12 +84,13 @@ func CreateEventHandler(conf *WavefrontConfig) *EventHandler {
 
 	numMetricsSent := newCounter("total-metrics-sent", internalTags)
 	metricsSendFailure := newCounter("metrics-send-failure", internalTags)
+	metricsDropped := newCounter("metrics-filtered", internalTags)
 	numValueMetricReceived := newCounter("value-metric-received", internalTags)
 	numCounterEventReceived := newCounter("counter-event-received", internalTags)
 	numContainerMetricReceived := newCounter("container-metric-received", internalTags)
 	handleErrorMetric := newCounter("firehose-connection-error", internalTags)
 
-	return &EventHandler{
+	ev := &EventHandler{
 		sender:                     sender,
 		reporter:                   reporter,
 		prefix:                     strings.Trim(conf.Prefix, " "),
@@ -95,11 +98,14 @@ func CreateEventHandler(conf *WavefrontConfig) *EventHandler {
 		filter:                     NewGlobFilter(conf.Filters),
 		numMetricsSent:             numMetricsSent,
 		metricsSendFailure:         metricsSendFailure,
+		metricsDropped:             metricsDropped,
 		numValueMetricReceived:     numValueMetricReceived,
 		numCounterEventReceived:    numCounterEventReceived,
 		numContainerMetricReceived: numContainerMetricReceived,
 		handleErrorMetric:          handleErrorMetric,
 	}
+	ev.startHealthReport()
+	return ev
 }
 
 func newCounter(name string, tags map[string]string) metrics.Counter {
@@ -214,7 +220,7 @@ func (w *EventHandler) sendMetric(name string, value float64, ts int64, source s
 			logger.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
 		}
 
-		status := "dropped"
+		status := "filtered"
 		if w.filter.Match(name, tags) {
 			status = "accepted"
 		}
@@ -231,10 +237,21 @@ func (w *EventHandler) sendMetric(name string, value float64, ts int64, source s
 		} else {
 			w.numMetricsSent.Inc(1)
 		}
+	} else {
+		w.metricsDropped.Inc(1)
 	}
 }
 
 //ReportError incremets the error counter
 func (w *EventHandler) ReportError(err error) {
 	w.handleErrorMetric.Inc(1)
+}
+
+func (w *EventHandler) startHealthReport() {
+	ticker := time.NewTicker(time.Minute)
+	go func() {
+		for range ticker.C {
+			logger.Printf("total metrics sent: %d  filtered: %d  failures: %d", w.numMetricsSent.Count(), w.metricsDropped.Count(), w.metricsSendFailure.Count())
+		}
+	}()
 }
