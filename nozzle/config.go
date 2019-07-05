@@ -30,7 +30,7 @@ type NozzleConfig struct {
 
 	SelectedEvents []events.Envelope_EventType `ignored:"true"`
 
-	CustomProxy proxyInfo `envconfig:"NOZZLE_PROXY_SELECTOR"`
+	AdvancedConfig advancedConfig `envconfig:"ADVANCED_CONFIG"`
 }
 
 // WavefrontConfig holds specific Wavefront env variables
@@ -48,30 +48,24 @@ type WavefrontConfig struct {
 	Filters *Filters `ignored:"true"`
 }
 
-// CustomProxyConfig holds info about the user proxy
-type customProxyConfig struct {
-	Value string    `json:"value"`
-	Proxy proxyInfo `json:"selected_option"`
-}
-
-// ProxyInfo custom proxy info
-type proxyInfo struct {
-	Address string `json:"custom_wf_proxy_addr"`
-	Port    int    `json:"custom_wf_proxy_port"`
+type advancedConfig struct {
+	Values struct {
+		ProxyAddress     string   `json:"custom_wf_proxy_addr"`
+		ProxyPort        int      `json:"custom_wf_proxy_port"`
+		SelectedEvents   []string `json:"selected_events"`
+		MetricsBlackList string   `json:"filter_metrics_black_list"`
+		MetricsWhiteList string   `json:"filter_metrics_white_list"`
+	} `json:"selected_option"`
 }
 
 // Decode json
-func (cpc *proxyInfo) Decode(value string) error {
-	var config customProxyConfig
-	err := json.Unmarshal([]byte(value), &config)
-	if err == nil {
-		*cpc = config.Proxy
-	}
+func (ac *advancedConfig) Decode(value string) error {
+	err := json.Unmarshal([]byte(value), &ac)
 	return err
 }
 
-func (cpc *proxyInfo) Valid() bool {
-	return cpc.Port > 0 && len(cpc.Address) > 0
+func (ac *advancedConfig) haveCustomProxy() bool {
+	return ac.Values.ProxyPort > 0 && len(ac.Values.ProxyAddress) > 0
 }
 
 type filtersConfig struct {
@@ -104,6 +98,9 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
+	if len(nozzleConfig.AdvancedConfig.Values.SelectedEvents) > 0 {
+		os.Setenv("NOZZLE_SELECTED_EVENTS", strings.Join(nozzleConfig.AdvancedConfig.Values.SelectedEvents, ","))
+	}
 	selectedEvents, err := ParseSelectedEvents()
 	if err != nil {
 		return nil, err
@@ -116,11 +113,17 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
-	if nozzleConfig.CustomProxy.Valid() {
-		wavefrontConfig.ProxyAddr = nozzleConfig.CustomProxy.Address
-		wavefrontConfig.ProxyPort = nozzleConfig.CustomProxy.Port
+	if nozzleConfig.AdvancedConfig.haveCustomProxy() {
+		wavefrontConfig.ProxyAddr = nozzleConfig.AdvancedConfig.Values.ProxyAddress
+		wavefrontConfig.ProxyPort = nozzleConfig.AdvancedConfig.Values.ProxyPort
 	}
 
+	if len(nozzleConfig.AdvancedConfig.Values.MetricsWhiteList) > 0 {
+		os.Setenv("FILTER_METRICS_WHITE_LIST", nozzleConfig.AdvancedConfig.Values.MetricsWhiteList)
+	}
+	if len(nozzleConfig.AdvancedConfig.Values.MetricsBlackList) > 0 {
+		os.Setenv("FILTER_METRICS_BLACK_LIST", nozzleConfig.AdvancedConfig.Values.MetricsBlackList)
+	}
 	f := &filtersConfig{}
 	err = envconfig.Process("filter", f)
 	if err != nil {
@@ -135,6 +138,8 @@ func ParseConfig() (*Config, error) {
 		TagInclude:          f.TagInclude,
 		TagExclude:          f.TagExclude,
 	}
+
+	// if len(nozzleConfig.AdvancedConfig.Values.)
 
 	config := &Config{Nozzle: nozzleConfig, Wavefront: wavefrontConfig}
 	return config, nil
