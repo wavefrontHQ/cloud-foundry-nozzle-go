@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
 )
@@ -130,21 +131,28 @@ func TestSelectedEvents(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
-func TestProxySelector(t *testing.T) {
+func TestAdvancedConfig(t *testing.T) {
 	os.Clearenv()
 	setUpFooEnv()
-	os.Setenv("NOZZLE_PROXY_SELECTOR", `{"value":"custom","selected_option":{"custom_wf_proxy_addr":"8.8.8.8","custom_wf_proxy_port":1234}}`)
+	os.Setenv("ADVANCED_CONFIG", `{"value":"yes","selected_option":{"custom_wf_proxy_addr":"addr.es","custom_wf_proxy_port":1234,"filter_metrics_black_list":"Black","filter_metrics_white_list":"White","instances":3,"selected_events":["ValueMetric","ContainerMetric"]}}`)
 
 	cfg, err := nozzle.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
-	assert.Equal(t, "8.8.8.8", cfg.Wavefront.ProxyAddr)
+	assert.Equal(t, "addr.es", cfg.Wavefront.ProxyAddr)
 	assert.Equal(t, 1234, cfg.Wavefront.ProxyPort)
+	assert.Equal(t, 2, len(cfg.Nozzle.SelectedEvents))
+	assert.Equal(t, events.Envelope_ValueMetric, cfg.Nozzle.SelectedEvents[0])
+	assert.Equal(t, events.Envelope_ContainerMetric, cfg.Nozzle.SelectedEvents[1])
+	assert.Equal(t, "addr.es", cfg.Wavefront.ProxyAddr)
+	assert.Equal(t, "addr.es", cfg.Wavefront.ProxyAddr)
+	assert.Equal(t, "White", cfg.Wavefront.Filters.MetricsWhiteList[0])
+	assert.Equal(t, "Black", cfg.Wavefront.Filters.MetricsBlackList[0])
 
 	os.Clearenv()
 	setUpFooEnv()
-	os.Setenv("NOZZLE_PROXY_SELECTOR", `{"value":"default","selected_option":{}}`)
+	os.Setenv("ADVANCED_CONFIG", `{"value":"no","selected_option":{}}`)
 
 	cfg, err = nozzle.ParseConfig()
 	if err != nil {
@@ -152,6 +160,7 @@ func TestProxySelector(t *testing.T) {
 	}
 	assert.Equal(t, "", cfg.Wavefront.ProxyAddr)
 	assert.Equal(t, 0, cfg.Wavefront.ProxyPort)
+	assert.Equal(t, 3, len(cfg.Nozzle.SelectedEvents))
 }
 
 func contains(a []string, x string) bool {
