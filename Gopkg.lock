@@ -26,12 +26,11 @@
   version = "v2.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:a965e93173d9b30de4cc01c4a2aaaaa0478ece976f56dabb6e662800abf21011"
+  digest = "1:8597ea40ac83a647f7f67db149d1f0921d7baf873d2fd14ee3e475adeecae0ae"
   name = "github.com/cloudfoundry-community/go-cfclient"
   packages = ["."]
   pruneopts = "UT"
-  revision = "f136f9222381e2fea5099f62e4b751dcb660ff82"
+  revision = "16c98753d3152f9d80d3c121523536858095a3da"
 
 [[projects]]
   digest = "1:9148c060d019cb181efbabd6e5858e7727796d62d16f002f23addcf2cc374818"
@@ -47,7 +46,6 @@
   version = "v2.1.0"
 
 [[projects]]
-  branch = "master"
   digest = "1:e40a214426e6825d5c4067ebbb788c06be08ef657918e45a8f7fc45685431098"
   name = "github.com/cloudfoundry/sonde-go"
   packages = ["events"]
@@ -169,12 +167,12 @@
   version = "v1.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:2280e07b45fd1738935db641e4b0b135aa4ca7248e353d535485638b0f73e21e"
+  digest = "1:fd13842de24935850da66d3884da230deb7e53d366f08041eb23b6198e5703af"
   name = "github.com/wavefronthq/go-metrics-wavefront"
   packages = ["reporting"]
   pruneopts = "UT"
-  revision = "9e50dfd34d67628bcc887f4728df4d57c9fc963a"
+  revision = "d106aec20380701d2ef4b7ac565dfddcf9a5ccc4"
+  version = "v1.0.0"
 
 [[projects]]
   digest = "1:f8fa24dccae1fe5bb5e9dbd7adc11588cc6e0a2767576251318835bc4998f13d"
