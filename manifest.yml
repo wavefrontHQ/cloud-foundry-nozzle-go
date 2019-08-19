@@ -19,4 +19,4 @@ applications:
     WAVEFRONT_API_TOKEN: .........
     WAVEFRONT_FLUSH_INTERVAL: 15
     WAVEFRONT_PREFIX: pcf
-    WAVEFRONT_FOUNDATION: fundation
+    WAVEFRONT_FOUNDATION: foundation

@@ -208,7 +208,9 @@ func (w *EventHandler) getTags(event *events.Envelope) map[string]string {
 	tags["foundation"] = w.foundation
 
 	for k, v := range event.GetTags() {
-		tags[k] = v
+		if len(k) > 0 && len(v) > 0 {
+			tags[k] = v
+		}
 	}
 	return tags
 }
@@ -242,7 +244,7 @@ func (w *EventHandler) sendMetric(name string, value float64, ts int64, source s
 	}
 }
 
-//ReportError incremets the error counter
+//ReportError increments the error counter
 func (w *EventHandler) ReportError(err error) {
 	w.handleErrorMetric.Inc(1)
 }
