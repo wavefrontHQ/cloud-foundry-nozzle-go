@@ -24,11 +24,12 @@ type NozzleConfig struct {
 	Password               string `required:"true"`
 	FirehoseSubscriptionID string `required:"true" envconfig:"firehose_subscription_id"`
 	SkipSSL                bool   `default:"false" envconfig:"skip_ssl"`
+	LogStreamUrl           string `required:"true" envconfig:"log_stream_url"`
 
 	AppCacheExpiration time.Duration `split_words:"true" default:"6h"`
 	AppCacheSize       int           `split_words:"true" default:"50000"`
 
-	SelectedEvents []events.Envelope_EventType `ignored:"true"`
+	SelectedEvents []string `ignored:"true"`
 
 	AdvancedConfig advancedConfig `envconfig:"ADVANCED_CONFIG"`
 }
@@ -161,27 +162,17 @@ func parseIndexedVars(varName string) {
 }
 
 // ParseSelectedEvents get the Selected Events from the env
-func ParseSelectedEvents() ([]events.Envelope_EventType, error) {
+func ParseSelectedEvents() ([]string, error) {
 	orgEnvValue := os.Getenv("NOZZLE_SELECTED_EVENTS")
 	envValue := strings.Trim(orgEnvValue, "[]")
 	if envValue == "" {
-		return defaultEvents, nil
+		envValue = "log,counter,gauge,timer,event"
 	}
 
-	selectedEvents := []events.Envelope_EventType{}
 	sep := " "
 	if strings.Contains(envValue, ",") {
 		sep = ","
 	}
-	for _, envValueSplit := range strings.Split(envValue, sep) {
-		envValueSlitTrimmed := strings.TrimSpace(envValueSplit)
-		val, found := events.Envelope_EventType_value[envValueSlitTrimmed]
-		if found {
-			selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
-		} else {
-			return nil, fmt.Errorf("[%s] is not a valid event type", orgEnvValue)
-		}
-	}
 
-	return selectedEvents, nil
+	return strings.Split(envValue, sep), nil
 }
