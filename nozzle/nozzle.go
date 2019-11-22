@@ -3,9 +3,7 @@ package nozzle
 import (
 	"log"
 	"os"
-	"reflect"
 
-	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	"github.com/cloudfoundry/sonde-go/events"
 	metrics "github.com/rcrowley/go-metrics"
 	"github.com/wavefronthq/go-metrics-wavefront/reporting"
@@ -16,7 +14,7 @@ var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
 // Nozzle will read all CF events and sent it to the Forwarder
 type Nozzle struct {
-	EventsChannel chan *loggregator_v2.Envelope
+	EventsChannel chan *events.Envelope
 	ErrorsChannel chan error
 	APIClient     *APIClient
 
@@ -29,7 +27,7 @@ type Nozzle struct {
 func NewNozzle(conf *Config) *Nozzle {
 	nozzle := &Nozzle{
 		eventSerializer: CreateEventHandler(conf.Wavefront),
-		EventsChannel:   make(chan *loggregator_v2.Envelope, 1000),
+		EventsChannel:   make(chan *events.Envelope, 1000),
 		ErrorsChannel:   make(chan error),
 	}
 
@@ -41,9 +39,9 @@ func NewNozzle(conf *Config) *Nozzle {
 		events.Envelope_Error:           false,
 		events.Envelope_ContainerMetric: false,
 	}
-	// for _, selectedEventType := range conf.Nozzle.SelectedEvents {
-	// 	nozzle.includedEventTypes[selectedEventType] = true
-	// }
+	for _, selectedEventType := range conf.Nozzle.SelectedEvents {
+		nozzle.includedEventTypes[selectedEventType] = true
+	}
 
 	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(nozzle.queueSize), GetInternalTags())
 
@@ -66,35 +64,27 @@ func (s *Nozzle) run() {
 	}
 }
 
-func (s *Nozzle) handleEvent(envelope *loggregator_v2.Envelope) {
-	switch envelope.GetMessage().(type) {
-	case *loggregator_v2.Envelope_Counter:
-		s.eventSerializer.BuildCounterEvent(envelope)
-	case *loggregator_v2.Envelope_Gauge:
-		s.eventSerializer.BuildGaugeEvent(envelope)
-	default:
-		logger.Panicf("---> %v\n", reflect.TypeOf(envelope.GetMessage()))
+func (s *Nozzle) handleEvent(envelope *events.Envelope) {
+	eventType := envelope.GetEventType()
+	if !s.includedEventTypes[eventType] {
+		return
 	}
-	// eventType := envelope.GetEventType()
-	// if !s.includedEventTypes[eventType] {
-	// 	return
-	// }
 
-	// switch eventType {
-	// case events.Envelope_ValueMetric:
-	// 	s.eventSerializer.BuildValueMetricEvent(envelope)
-	// case events.Envelope_CounterEvent:
-	// 	s.eventSerializer.BuildCounterEvent(envelope)
-	// case events.Envelope_ContainerMetric:
-	// 	appGuIG := envelope.GetContainerMetric().GetApplicationId()
-	// 	if s.APIClient != nil {
-	// 		appInfo, err := s.APIClient.GetApp(appGuIG)
-	// 		if err != nil && debug {
-	// 			logger.Print("[ERROR]", err)
-	// 		}
-	// 		s.eventSerializer.BuildContainerEvent(envelope, appInfo)
-	// 	} else {
-	// 		logger.Fatal("[ERROR] APIClient is null")
-	// 	}
-	// }
+	switch eventType {
+	case events.Envelope_ValueMetric:
+		s.eventSerializer.BuildValueMetricEvent(envelope)
+	case events.Envelope_CounterEvent:
+		s.eventSerializer.BuildCounterEvent(envelope)
+	case events.Envelope_ContainerMetric:
+		appGuIG := envelope.GetContainerMetric().GetApplicationId()
+		if s.APIClient != nil {
+			appInfo, err := s.APIClient.GetApp(appGuIG)
+			if err != nil && debug {
+				logger.Print("[ERROR]", err)
+			}
+			s.eventSerializer.BuildContainerEvent(envelope, appInfo)
+		} else {
+			logger.Fatal("[ERROR] APIClient is null")
+		}
+	}
 }

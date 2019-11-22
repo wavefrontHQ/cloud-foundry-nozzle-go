@@ -1,102 +1,75 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"log"
-	"net/http"
 	"os"
 	"reflect"
 
-	loggregator "code.cloudfoundry.org/go-loggregator"
-	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
+	"github.com/cloudfoundry/noaa/consumer"
 	noaaerrors "github.com/cloudfoundry/noaa/errors"
 	"github.com/gorilla/websocket"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
+	wfnozzle "github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
 )
 
 var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
 var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
-var allSelectors = []*loggregator_v2.Selector{
-	{
-		Message: &loggregator_v2.Selector_Log{
-			Log: &loggregator_v2.LogSelector{},
-		},
-	},
-	{
-		Message: &loggregator_v2.Selector_Counter{
-			Counter: &loggregator_v2.CounterSelector{},
-		},
-	},
-	{
-		Message: &loggregator_v2.Selector_Gauge{
-			Gauge: &loggregator_v2.GaugeSelector{},
-		},
-	},
-	// {
-	// 	Message: &loggregator_v2.Selector_Timer{
-	// 		Timer: &loggregator_v2.TimerSelector{},
-	// 	},
-	// },
-	{
-		Message: &loggregator_v2.Selector_Event{
-			Event: &loggregator_v2.EventSelector{},
-		},
-	},
-}
-
 func main() {
-	conf, err := nozzle.ParseConfig()
+	conf, err := wfnozzle.ParseConfig()
 	if err != nil {
 		logger.Fatal("[ERROR] Unable to build config from environment: ", err)
 	}
 	logger.Printf("Forwarding events: %s", conf.Nozzle.SelectedEvents)
 
+	nozzle := wfnozzle.NewNozzle(conf)
+
 	for {
-		uaaClient, err := nozzle.NewUAA(conf.Nozzle.APIURL, conf.Nozzle.Username, conf.Nozzle.Password, true)
+		var trafficControllerURL string
+		logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
+
+		api, err := wfnozzle.NewAPIClient(conf.Nozzle)
 		if err != nil {
-			panic(err)
+			logger.Fatal("[ERROR] Unable to build API client: ", err)
 		}
 
-		err = receive(conf, uaaClient)
+		nozzle.APIClient = api
+
+		token, err := api.FetchAuthToken()
 		if err != nil {
-			logger.Println("ERROR !!!", err)
+			logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
 		}
+
+		trafficControllerURL = api.FetchTrafficControllerURL()
+		if trafficControllerURL == "" {
+			logger.Fatal("[ERROR] trafficControllerURL from client was blank")
+		}
+
+		logger.Printf("Consuming firehose: %v\n", trafficControllerURL)
+		noaaConsumer := consumer.New(trafficControllerURL, &tls.Config{
+			InsecureSkipVerify: conf.Nozzle.SkipSSL,
+		}, nil)
+		events, errs := noaaConsumer.FirehoseWithoutReconnect(conf.Nozzle.FirehoseSubscriptionID, token)
+
+		done := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case event := <-events:
+					nozzle.EventsChannel <- event
+				case err := <-errs:
+					printError(err)
+					nozzle.ErrorsChannel <- err
+					close(done)
+					return
+				}
+			}
+		}()
+		<-done
+
+		noaaConsumer.Close()
 		logger.Println("Reconnecting")
 	}
-}
-
-func receive(conf *nozzle.Config, uaaClient nozzle.UAA) error {
-	wfNozzle := nozzle.NewNozzle(conf)
-
-	token, err := uaaClient.GetAuthToken()
-	if err != nil {
-		return err
-	}
-
-	c := loggregator.NewRLPGatewayClient(
-		conf.Nozzle.LogStreamUrl,
-		loggregator.WithRLPGatewayClientLogger(logger),
-		loggregator.WithRLPGatewayHTTPClient(&tokenAttacher{
-			token: token,
-		}),
-	)
-
-	es := c.Stream(context.Background(), &loggregator_v2.EgressBatchRequest{
-		Selectors: allSelectors,
-	})
-
-	// marshaler := jsonpb.Marshaler{}
-
-	for {
-		for _, e := range es() {
-			wfNozzle.EventsChannel <- e
-			// log.Printf("---> %v\n", reflect.TypeOf(e.GetMessage()))
-			// log.Printf("%+v\n", e.GetMessage())
-		}
-	}
-
 }
 
 func printError(err error) {
@@ -110,19 +83,4 @@ func printError(err error) {
 	default:
 		logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
 	}
-}
-
-type tokenAttacher struct {
-	token string
-}
-
-func (a *tokenAttacher) Do(req *http.Request) (*http.Response, error) {
-	config := &tls.Config{
-		InsecureSkipVerify: true,
-	}
-	tr := &http.Transport{TLSClientConfig: config}
-	client := &http.Client{Transport: tr}
-
-	req.Header.Set("Authorization", a.token)
-	return client.Do(req)
 }
