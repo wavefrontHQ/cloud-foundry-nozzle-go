@@ -43,7 +43,7 @@ func NewNozzle(conf *common.Config) *Nozzle {
 		events.Envelope_ContainerMetric: false,
 	}
 
-	for _, selectedEventType := range parseSelectedEvents(conf.Nozzle.SelectedEvents) {
+	for _, selectedEventType := range ParseSelectedEvents(conf.Nozzle.SelectedEvents) {
 		nozzle.includedEventTypes[selectedEventType] = true
 	}
 
@@ -93,7 +93,7 @@ func (s *Nozzle) handleEvent(envelope *events.Envelope) {
 	}
 }
 
-func parseSelectedEvents(orgEnvValue string) []events.Envelope_EventType {
+func ParseSelectedEvents(orgEnvValue string) []events.Envelope_EventType {
 	envValue := strings.Trim(orgEnvValue, "[]")
 	if envValue == "" {
 		return defaultEvents
@@ -110,7 +110,7 @@ func parseSelectedEvents(orgEnvValue string) []events.Envelope_EventType {
 		if found {
 			selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
 		} else {
-			common.Logger.Fatal("[%s] is not a valid event type", orgEnvValue)
+			common.Logger.Panicf("[%s] is not a valid event type", orgEnvValue)
 		}
 	}
 

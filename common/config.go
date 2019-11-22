@@ -29,11 +29,11 @@ type NozzleConfig struct {
 	AppCacheExpiration time.Duration `split_words:"true" default:"6h"`
 	AppCacheSize       int           `split_words:"true" default:"50000"`
 
-	SelectedEvents string `required:"true" envconfig:"selected_events"`
+	SelectedEvents string `required:"flase" envconfig:"selected_events"`
 
 	AdvancedConfig advancedConfig `envconfig:"ADVANCED_CONFIG"`
 
-	Legacy bool `default:"false" envconfig:"legazy"`
+	Legacy bool `default:"false" envconfig:"legacy"`
 }
 
 // WavefrontConfig holds specific Wavefront env variables

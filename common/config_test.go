@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/common"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/legacy"
 )
 
 func setUpFooEnv() {
@@ -15,6 +15,8 @@ func setUpFooEnv() {
 	os.Setenv("NOZZLE_USERNAME", "foo")
 	os.Setenv("NOZZLE_PASSWORD", "foo")
 	os.Setenv("NOZZLE_FIREHOSE_SUBSCRIPTION_ID", "foo")
+	os.Setenv("NOZZLE_LOG_STREAM_URL", "true")
+
 	os.Setenv("WAVEFRONT_FLUSH_INTERVAL", "1")
 	os.Setenv("WAVEFRONT_PREFIX", "foo")
 	os.Setenv("WAVEFRONT_FOUNDATION", "foo")
@@ -107,28 +109,46 @@ func TestEmptyIndexed(t *testing.T) {
 	assert.Equal(t, 0, len(config.Wavefront.Filters.MetricsTagBlackList))
 }
 
-func TestSelectedEvents(t *testing.T) {
-	os.Clearenv()
-	selectedEvents, err := common.ParseSelectedEvents()
-	assert.Nil(t, err, "error: %v", err)
+func TestSelectedEventsLegacy(t *testing.T) {
+	selectedEvents := legacy.ParseSelectedEvents("")
 	assert.Equal(t, 3, len(selectedEvents), selectedEvents)
 
-	os.Clearenv()
-	os.Setenv("NOZZLE_SELECTED_EVENTS", "ValueMetric,CounterEvent")
-	selectedEvents, err = common.ParseSelectedEvents()
-	assert.Nil(t, err, "error: %v", err)
+	selectedEvents = legacy.ParseSelectedEvents("ValueMetric,CounterEvent")
 	assert.Equal(t, 2, len(selectedEvents), selectedEvents)
 
-	os.Clearenv()
 	os.Setenv("NOZZLE_SELECTED_EVENTS", "[ValueMetric ContainerMetric]")
-	selectedEvents, err = common.ParseSelectedEvents()
-	assert.Nil(t, err, "error: %v", err)
+	selectedEvents = legacy.ParseSelectedEvents("[ValueMetric ContainerMetric]")
 	assert.Equal(t, 2, len(selectedEvents), selectedEvents)
 
+	assertPanic(t, func() { legacy.ParseSelectedEvents("[ValueMetric Contai__nerMetric]") })
+}
+
+func assertPanic(t *testing.T, f func()) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+	}()
+	f()
+}
+
+func TestLegacySelector(t *testing.T) {
 	os.Clearenv()
-	os.Setenv("NOZZLE_SELECTED_EVENTS", "[ValueMetric Contai__nerMetric]")
-	selectedEvents, err = common.ParseSelectedEvents()
-	assert.NotNil(t, err)
+	setUpFooEnv()
+	os.Setenv("NOZZLE_LEGACY", "true")
+	cfg, err := common.ParseConfig()
+	if err != nil {
+		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
+	}
+	assert.True(t, cfg.Nozzle.Legacy)
+
+	os.Clearenv()
+	setUpFooEnv()
+	cfg, err = common.ParseConfig()
+	if err != nil {
+		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
+	}
+	assert.False(t, cfg.Nozzle.Legacy)
 }
 
 func TestAdvancedConfig(t *testing.T) {
@@ -142,9 +162,6 @@ func TestAdvancedConfig(t *testing.T) {
 	}
 	assert.Equal(t, "addr.es", cfg.Wavefront.ProxyAddr)
 	assert.Equal(t, 1234, cfg.Wavefront.ProxyPort)
-	assert.Equal(t, 2, len(cfg.Nozzle.SelectedEvents))
-	assert.Equal(t, events.Envelope_ValueMetric, cfg.Nozzle.SelectedEvents[0])
-	assert.Equal(t, events.Envelope_ContainerMetric, cfg.Nozzle.SelectedEvents[1])
 	assert.Equal(t, "addr.es", cfg.Wavefront.ProxyAddr)
 	assert.Equal(t, "addr.es", cfg.Wavefront.ProxyAddr)
 	assert.Equal(t, "White", cfg.Wavefront.Filters.MetricsWhiteList[0])
@@ -160,7 +177,6 @@ func TestAdvancedConfig(t *testing.T) {
 	}
 	assert.Equal(t, "", cfg.Wavefront.ProxyAddr)
 	assert.Equal(t, 0, cfg.Wavefront.ProxyPort)
-	assert.Equal(t, 3, len(cfg.Nozzle.SelectedEvents))
 }
 
 func contains(a []string, x string) bool {

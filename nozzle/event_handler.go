@@ -82,6 +82,21 @@ func (w *EventHandler) BuildCounterEvent(event *loggregator_v2.Envelope) {
 	w.wf.SendMetric(metricName+".delta", float64(delta), ts, source, tags)
 }
 
+// < [WAVEFRONT] metricName: pcf.container.rep.cpu_percentage
+// < [WAVEFRONT] metricName: pcf.container.rep.disk_bytes
+// < [WAVEFRONT] metricName: pcf.container.rep.disk_bytes_quota
+// < [WAVEFRONT] metricName: pcf.container.rep.memory_bytes
+// < [WAVEFRONT] metricName: pcf.container.rep.memory_bytes_quota
+
+// > [WAVEFRONT] metricName: pcf.container.rep.cpu.percentage
+// > [WAVEFRONT] metricName: pcf.container.rep.disk.bytes
+// > [WAVEFRONT] metricName: pcf.container.rep.disk_quota.bytes
+// > [WAVEFRONT] metricName: pcf.container.rep.memory.bytes
+// > [WAVEFRONT] metricName: pcf.container.rep.memoryStats.lastGCPauseTimeNS.ns
+// > [WAVEFRONT] metricName: pcf.container.rep.memoryStats.numBytesAllocatedHeap.Bytes
+// > [WAVEFRONT] metricName: pcf.container.rep.memoryStats.numBytesAllocatedStack.Bytes
+// > [WAVEFRONT] metricName: pcf.container.rep.memory_quota.bytes
+
 //BuildGaugeEvent parse and report metrics
 func (w *EventHandler) BuildGaugeEvent(event *loggregator_v2.Envelope) {
 	w.numGaugeMetricReceived.Inc(1)
@@ -93,8 +108,6 @@ func (w *EventHandler) BuildGaugeEvent(event *loggregator_v2.Envelope) {
 		}
 		metricName += "." + event.GetTags()["origin"]
 		metricName += "." + name
-
-		common.Logger.Println("metricName:", metricName)
 
 		source, tags, ts := w.getMetricInfo(event)
 
