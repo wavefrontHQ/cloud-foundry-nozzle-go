@@ -1,8 +1,9 @@
-package nozzle
+package common
 
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -41,7 +42,10 @@ func GetInternalTags() map[string]string {
 		internalTags["application_idx"] = fmt.Sprint(app.Idx)
 		internalTags["application_name"] = app.Name
 	} else {
-		logger.Printf("[ERROR] %v", err)
+		Logger.Printf("[ERROR] %v", err)
 	}
 	return internalTags
 }
+
+var Logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
+var Debug = os.Getenv("WAVEFRONT_DEBUG") == "true"

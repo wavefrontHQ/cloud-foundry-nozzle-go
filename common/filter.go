@@ -1,4 +1,4 @@
-package nozzle
+package common
 
 import (
 	"fmt"
@@ -58,12 +58,12 @@ func NewGlobFilter(cfg *Filters) Filter {
 	cfg.TagInclude = cleanUp(cfg.TagInclude)
 	cfg.TagExclude = cleanUp(cfg.TagExclude)
 
-	logger.Printf("filters: MetricsWhiteList = '%v", cfg.MetricsWhiteList)
-	logger.Printf("filters: MetricsBlackList = '%v", cfg.MetricsBlackList)
-	logger.Printf("filters: MetricsTagWhiteList = '%v", cfg.MetricsTagWhiteList)
-	logger.Printf("filters: MetricsTagBlackList = '%v", cfg.MetricsTagBlackList)
-	logger.Printf("filters: TagInclude = '%v", cfg.TagInclude)
-	logger.Printf("filters: TagExclude = '%v", cfg.TagExclude)
+	Logger.Printf("filters: MetricsWhiteList = '%v", cfg.MetricsWhiteList)
+	Logger.Printf("filters: MetricsBlackList = '%v", cfg.MetricsBlackList)
+	Logger.Printf("filters: MetricsTagWhiteList = '%v", cfg.MetricsTagWhiteList)
+	Logger.Printf("filters: MetricsTagBlackList = '%v", cfg.MetricsTagBlackList)
+	Logger.Printf("filters: TagInclude = '%v", cfg.TagInclude)
+	Logger.Printf("filters: TagExclude = '%v", cfg.TagExclude)
 
 	return &globFilter{
 		metricWhitelist:    compile(cfg.MetricsWhiteList),

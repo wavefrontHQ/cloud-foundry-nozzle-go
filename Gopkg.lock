@@ -3,11 +3,38 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:78b71e161b95e90a32c1c84a61e1b896834230ca41ace18fb0aed6da1fa028f3"
+  name = "code.cloudfoundry.org/go-diodes"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "f77fb823c7ee0156ed4cdadaf4f79ac3fd84613f"
+
+[[projects]]
+  digest = "1:ba27cf026518253be1a17014f973eddf9249f6d4cdc1af0f63bd53e129eab418"
+  name = "code.cloudfoundry.org/go-loggregator"
+  packages = [
+    ".",
+    "rpc/loggregator_v2",
+  ]
+  pruneopts = "UT"
+  revision = "b8d176783c8a6280a34f0e19e0e8f57d722773a1"
+  version = "v7.7.0"
+
+[[projects]]
+  branch = "master"
   digest = "1:ef4eaf0b9b15b3f5e5afaf6a52303c39d46a9c3b6d13d0d81e4b785002606692"
   name = "code.cloudfoundry.org/gofileutils"
   packages = ["fileutils"]
   pruneopts = "UT"
   revision = "4d0c80011a0f37da1711c184028bc40137cd45af"
+
+[[projects]]
+  branch = "master"
+  digest = "1:1923d1fb0da377cb0f9174bb14b0d70e8f21d146176eff940c2580a27c930374"
+  name = "code.cloudfoundry.org/rfc5424"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "236a6d29298aea12f69978f33393d12465abc429"
 
 [[projects]]
   digest = "1:55388fd080150b9a072912f97b1f5891eb0b50df43401f8b75fb4273d3fec9fc"
@@ -31,6 +58,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "16c98753d3152f9d80d3c121523536858095a3da"
+
+[[projects]]
+  branch = "master"
+  digest = "1:748e0542f42470c57952bca598d750ea1b77fbc479425902c3ad9f11f2911685"
+  name = "github.com/cloudfoundry-incubator/uaago"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8136b7bbe76e26394600a790a95c15eac955f4fc"
 
 [[projects]]
   digest = "1:9148c060d019cb181efbabd6e5858e7727796d62d16f002f23addcf2cc374818"
@@ -90,9 +125,17 @@
   version = "v1.2.1"
 
 [[projects]]
-  digest = "1:318f1c959a8a740366fce4b1e1eb2fd914036b4af58fbd0a003349b305f118ad"
+  digest = "1:2356bcf5096ecb76bfcce7cb96af2d58c68ac63206c22d4d2aff9b9df70a486e"
   name = "github.com/golang/protobuf"
-  packages = ["proto"]
+  packages = [
+    "jsonpb",
+    "proto",
+    "ptypes",
+    "ptypes/any",
+    "ptypes/duration",
+    "ptypes/struct",
+    "ptypes/timestamp",
+  ]
   pruneopts = "UT"
   revision = "c823c79ea1570fb5ff454033735a8e68575d1d0f"
   version = "v1.3.0"
@@ -189,11 +232,17 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:f8b491a7c25030a895a0e579742d07136e6958e77ef2d46e769db8eec4e58fcd"
+  digest = "1:5b51b81e299d0dfd03f567fd8d8a2d7ee954b3b72c69292f07c49aae785b6dd9"
   name = "golang.org/x/net"
   packages = [
     "context",
     "context/ctxhttp",
+    "http/httpguts",
+    "http2",
+    "http2/hpack",
+    "idna",
+    "internal/timeseries",
+    "trace",
   ]
   pruneopts = "UT"
   revision = "312bce6e941fc7e152b630a8643ea239afc12ddd"
@@ -209,6 +258,39 @@
   ]
   pruneopts = "UT"
   revision = "e64efc72b421e893cbf63f17ba2221e7d6d0b0f3"
+
+[[projects]]
+  branch = "master"
+  digest = "1:fc96eb481f72e9a5edeb4bb3f3610d3b9384c036f7c1e39f8c0dedff23d0c34d"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  pruneopts = "UT"
+  revision = "bd437916bb0eb726b873ee8e9b2dcf212d32e2fd"
+
+[[projects]]
+  digest = "1:8d8faad6b12a3a4c819a3f9618cb6ee1fa1cfc33253abeeea8b55336721e3405"
+  name = "golang.org/x/text"
+  packages = [
+    "collate",
+    "collate/build",
+    "internal/colltab",
+    "internal/gen",
+    "internal/language",
+    "internal/language/compact",
+    "internal/tag",
+    "internal/triegen",
+    "internal/ucd",
+    "language",
+    "secure/bidirule",
+    "transform",
+    "unicode/bidi",
+    "unicode/cldr",
+    "unicode/norm",
+    "unicode/rangetable",
+  ]
+  pruneopts = "UT"
+  revision = "342b2e1fbaa52c93f31447ad2c6abc048c63e475"
+  version = "v0.3.2"
 
 [[projects]]
   digest = "1:6f3bd49ddf2e104e52062774d797714371fac1b8bddfd8e124ce78e6b2264a10"
@@ -227,6 +309,58 @@
   version = "v1.4.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:583a0c80f5e3a9343d33aea4aead1e1afcc0043db66fdf961ddd1fe8cd3a4faf"
+  name = "google.golang.org/genproto"
+  packages = ["googleapis/rpc/status"]
+  pruneopts = "UT"
+  revision = "83cc0476cb11ea0da33dacd4c6354ab192de6fe6"
+
+[[projects]]
+  digest = "1:b59ce3ddb11daeeccccc9cb3183b58ebf8e9a779f1c853308cd91612e817a301"
+  name = "google.golang.org/grpc"
+  packages = [
+    ".",
+    "backoff",
+    "balancer",
+    "balancer/base",
+    "balancer/roundrobin",
+    "binarylog/grpc_binarylog_v1",
+    "codes",
+    "connectivity",
+    "credentials",
+    "credentials/internal",
+    "encoding",
+    "encoding/proto",
+    "grpclog",
+    "internal",
+    "internal/backoff",
+    "internal/balancerload",
+    "internal/binarylog",
+    "internal/buffer",
+    "internal/channelz",
+    "internal/envconfig",
+    "internal/grpcrand",
+    "internal/grpcsync",
+    "internal/resolver/dns",
+    "internal/resolver/passthrough",
+    "internal/syscall",
+    "internal/transport",
+    "keepalive",
+    "metadata",
+    "naming",
+    "peer",
+    "resolver",
+    "serviceconfig",
+    "stats",
+    "status",
+    "tap",
+  ]
+  pruneopts = "UT"
+  revision = "1a3960e4bd028ac0cec0a2afd27d7d8e67c11514"
+  version = "v1.25.1"
+
+[[projects]]
   branch = "v2"
   digest = "1:4d2e5a73dc1500038e504a8d78b986630e3626dc027bc030ba5c75da257cdb96"
   name = "gopkg.in/yaml.v2"
@@ -238,7 +372,10 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "code.cloudfoundry.org/go-loggregator",
+    "code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2",
     "github.com/cloudfoundry-community/go-cfclient",
+    "github.com/cloudfoundry-incubator/uaago",
     "github.com/cloudfoundry/noaa/consumer",
     "github.com/cloudfoundry/noaa/errors",
     "github.com/cloudfoundry/sonde-go/events",

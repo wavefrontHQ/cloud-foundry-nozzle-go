@@ -1,4 +1,4 @@
-package nozzle_test
+package common_test
 
 import (
 	"log"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/stretchr/testify/assert"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/common"
 )
 
 func setUpFooEnv() {
@@ -25,7 +25,7 @@ func TestTagFilters(t *testing.T) {
 	setUpFooEnv()
 
 	os.Setenv("FILTER_METRICS_TAG_BLACK_LIST", "tag1:[foo1,foo2,foo3],tag2:[foo1,foo2]")
-	config, err := nozzle.ParseConfig()
+	config, err := common.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -38,7 +38,7 @@ func TestTagFilters(t *testing.T) {
 	assert.False(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo3"))
 
 	os.Setenv("FILTER_METRICS_TAG_BLACK_LIST", "tag1:foo1,foo2,foo3,tag1:foo1")
-	config, err = nozzle.ParseConfig()
+	config, err = common.ParseConfig()
 	if err != nil {
 		log.Print("[OK] Unable to build config from environment: ", err)
 	} else {
@@ -63,7 +63,7 @@ func TestIndexed(t *testing.T) {
 	os.Setenv("FILTER_METRICS_TAG_WHITE_LIST_2", "tag4:foo4")   // ignored
 	os.Setenv("FILTER_METRICS_TAG_WHITE_LIST_fsd", "tag4:foo4") // ignored
 
-	config, err := nozzle.ParseConfig()
+	config, err := common.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -89,7 +89,7 @@ func TestEmptyIndexed(t *testing.T) {
 	os.Clearenv()
 	setUpFooEnv()
 
-	config, err := nozzle.ParseConfig()
+	config, err := common.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -109,25 +109,25 @@ func TestEmptyIndexed(t *testing.T) {
 
 func TestSelectedEvents(t *testing.T) {
 	os.Clearenv()
-	selectedEvents, err := nozzle.ParseSelectedEvents()
+	selectedEvents, err := common.ParseSelectedEvents()
 	assert.Nil(t, err, "error: %v", err)
 	assert.Equal(t, 3, len(selectedEvents), selectedEvents)
 
 	os.Clearenv()
 	os.Setenv("NOZZLE_SELECTED_EVENTS", "ValueMetric,CounterEvent")
-	selectedEvents, err = nozzle.ParseSelectedEvents()
+	selectedEvents, err = common.ParseSelectedEvents()
 	assert.Nil(t, err, "error: %v", err)
 	assert.Equal(t, 2, len(selectedEvents), selectedEvents)
 
 	os.Clearenv()
 	os.Setenv("NOZZLE_SELECTED_EVENTS", "[ValueMetric ContainerMetric]")
-	selectedEvents, err = nozzle.ParseSelectedEvents()
+	selectedEvents, err = common.ParseSelectedEvents()
 	assert.Nil(t, err, "error: %v", err)
 	assert.Equal(t, 2, len(selectedEvents), selectedEvents)
 
 	os.Clearenv()
 	os.Setenv("NOZZLE_SELECTED_EVENTS", "[ValueMetric Contai__nerMetric]")
-	selectedEvents, err = nozzle.ParseSelectedEvents()
+	selectedEvents, err = common.ParseSelectedEvents()
 	assert.NotNil(t, err)
 }
 
@@ -136,7 +136,7 @@ func TestAdvancedConfig(t *testing.T) {
 	setUpFooEnv()
 	os.Setenv("ADVANCED_CONFIG", `{"value":"yes","selected_option":{"custom_wf_proxy_addr":"addr.es","custom_wf_proxy_port":1234,"filter_metrics_black_list":"Black","filter_metrics_white_list":"White","instances":3,"selected_events":["ValueMetric","ContainerMetric"]}}`)
 
-	cfg, err := nozzle.ParseConfig()
+	cfg, err := common.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -154,7 +154,7 @@ func TestAdvancedConfig(t *testing.T) {
 	setUpFooEnv()
 	os.Setenv("ADVANCED_CONFIG", `{"value":"no","selected_option":{}}`)
 
-	cfg, err = nozzle.ParseConfig()
+	cfg, err = common.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}

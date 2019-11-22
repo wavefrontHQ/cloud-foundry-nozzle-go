@@ -1,4 +1,4 @@
-package nozzle
+package legacy
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	metrics "github.com/rcrowley/go-metrics"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/common"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
 	cache "github.com/patrickmn/go-cache"
@@ -30,15 +31,15 @@ type AppInfo struct {
 func newAppInfo(app cfclient.App) *AppInfo {
 	space, err := app.Space()
 	if err != nil {
-		if debug {
-			logger.Printf("Error getting space name for app '%s'", app.Name)
+		if common.Debug {
+			common.Logger.Printf("Error getting space name for app '%s'", app.Name)
 		}
 		return &AppInfo{Name: app.Name, Space: "not_found", Org: "not_found"}
 	}
 	org, err := space.Org()
 	if err != nil {
-		if debug {
-			logger.Printf("Error getting org name for app '%s'", app.Name)
+		if common.Debug {
+			common.Logger.Printf("Error getting org name for app '%s'", app.Name)
 		}
 		return &AppInfo{Name: app.Name, Space: space.Name, Org: "not_found"}
 	}
@@ -46,7 +47,7 @@ func newAppInfo(app cfclient.App) *AppInfo {
 }
 
 // NewAPIClient crate a new ApiClient
-func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
+func NewAPIClient(conf *common.NozzleConfig) (*APIClient, error) {
 	apiURL := strings.Trim(conf.APIURL, " ")
 	if !isValidURL(apiURL) {
 		apiURL = "https://" + apiURL
@@ -89,7 +90,7 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 	appsInfo := make(map[string]*AppInfo)
 	apps, err := api.client.ListApps()
 	if err != nil {
-		logger.Fatal("[ERROR] error getting apps info: ", err)
+		common.Logger.Fatal("[ERROR] error getting apps info: ", err)
 	}
 	for _, app := range apps {
 		appsInfo[app.Guid] = newAppInfo(app)
@@ -117,8 +118,8 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 				api.appCache.Set(guid, app, 0)
 			} else {
 				errors.Inc(1)
-				if debug {
-					logger.Printf("[WARN] app cache is full")
+				if common.Debug {
+					common.Logger.Printf("[WARN] app cache is full")
 				}
 				break
 			}
@@ -141,8 +142,8 @@ func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
 		api.appCache.Set(guid, newAppInfo(app), 0)
 	} else {
 		errors.Inc(1)
-		if debug {
-			logger.Printf("[WARN] app cache is full")
+		if common.Debug {
+			common.Logger.Printf("[WARN] app cache is full")
 		}
 	}
 

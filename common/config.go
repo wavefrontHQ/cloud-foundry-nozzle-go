@@ -1,4 +1,4 @@
-package nozzle
+package common
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/kelseyhightower/envconfig"
 )
 
@@ -19,18 +18,22 @@ type Config struct {
 
 // NozzleConfig holds specific PCF env variables
 type NozzleConfig struct {
-	APIURL                 string `required:"true" envconfig:"api_url"`
-	Username               string `required:"true"`
-	Password               string `required:"true"`
+	APIURL       string `required:"true" envconfig:"api_url"`
+	Username     string `required:"true"`
+	Password     string `required:"true"`
+	LogStreamURL string `required:"true" envconfig:"log_stream_url"`
+
 	FirehoseSubscriptionID string `required:"true" envconfig:"firehose_subscription_id"`
 	SkipSSL                bool   `default:"false" envconfig:"skip_ssl"`
 
 	AppCacheExpiration time.Duration `split_words:"true" default:"6h"`
 	AppCacheSize       int           `split_words:"true" default:"50000"`
 
-	SelectedEvents []events.Envelope_EventType `ignored:"true"`
+	SelectedEvents string `required:"true" envconfig:"selected_events"`
 
 	AdvancedConfig advancedConfig `envconfig:"ADVANCED_CONFIG"`
+
+	Legacy bool `default:"false" envconfig:"legazy"`
 }
 
 // WavefrontConfig holds specific Wavefront env variables
@@ -79,12 +82,6 @@ type filtersConfig struct {
 	TagExclude []string `split_words:"true"`
 }
 
-var defaultEvents = []events.Envelope_EventType{
-	events.Envelope_ValueMetric,
-	events.Envelope_CounterEvent,
-	events.Envelope_ContainerMetric,
-}
-
 // ParseConfig reads users provided env variables and create a Config
 func ParseConfig() (*Config, error) {
 	parseIndexedVars("FILTER_METRICS_BLACK_LIST")
@@ -101,11 +98,6 @@ func ParseConfig() (*Config, error) {
 	if len(nozzleConfig.AdvancedConfig.Values.SelectedEvents) > 0 {
 		os.Setenv("NOZZLE_SELECTED_EVENTS", strings.Join(nozzleConfig.AdvancedConfig.Values.SelectedEvents, ","))
 	}
-	selectedEvents, err := ParseSelectedEvents()
-	if err != nil {
-		return nil, err
-	}
-	nozzleConfig.SelectedEvents = selectedEvents
 
 	wavefrontConfig := &WavefrontConfig{}
 	err = envconfig.Process("wavefront", wavefrontConfig)
@@ -158,30 +150,4 @@ func parseIndexedVars(varName string) {
 		os.Setenv(varName, newV)
 		idx++
 	}
-}
-
-// ParseSelectedEvents get the Selected Events from the env
-func ParseSelectedEvents() ([]events.Envelope_EventType, error) {
-	orgEnvValue := os.Getenv("NOZZLE_SELECTED_EVENTS")
-	envValue := strings.Trim(orgEnvValue, "[]")
-	if envValue == "" {
-		return defaultEvents, nil
-	}
-
-	selectedEvents := []events.Envelope_EventType{}
-	sep := " "
-	if strings.Contains(envValue, ",") {
-		sep = ","
-	}
-	for _, envValueSplit := range strings.Split(envValue, sep) {
-		envValueSlitTrimmed := strings.TrimSpace(envValueSplit)
-		val, found := events.Envelope_EventType_value[envValueSlitTrimmed]
-		if found {
-			selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
-		} else {
-			return nil, fmt.Errorf("[%s] is not a valid event type", orgEnvValue)
-		}
-	}
-
-	return selectedEvents, nil
 }
