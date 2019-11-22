@@ -1,110 +1,46 @@
 package nozzle
 
 import (
-	"errors"
 	"os"
 	"strings"
-	"time"
 
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
 	metrics "github.com/rcrowley/go-metrics"
 
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/common"
 	"github.com/wavefronthq/go-metrics-wavefront/reporting"
-	"github.com/wavefronthq/wavefront-sdk-go/application"
-	"github.com/wavefronthq/wavefront-sdk-go/senders"
 )
 
 var trace = os.Getenv("WAVEFRONT_TRACE") == "true"
 
 // EventHandler receive CF events and send metrics to WF
 type EventHandler struct {
-	sender     senders.Sender
-	reporter   reporting.WavefrontMetricsReporter
+	wf common.Wavefront
+
 	prefix     string
 	foundation string
-	filter     common.Filter
 
-	numMetricsSent             metrics.Counter
-	metricsSendFailure         metrics.Counter
-	metricsFiltered            metrics.Counter
-	numGaugeMetricReceived     metrics.Counter
-	numCounterEventReceived    metrics.Counter
-	numContainerMetricReceived metrics.Counter
-	handleErrorMetric          metrics.Counter
+	numGaugeMetricReceived  metrics.Counter
+	numCounterEventReceived metrics.Counter
 }
 
 // CreateEventHandler create a new EventHandler
 func CreateEventHandler(conf *common.WavefrontConfig) *EventHandler {
-	var sender senders.Sender
-	var err error
-
-	if len(conf.ProxyAddr) == 0 {
-		conf.ProxyAddr = os.Getenv("PROXY_CONN_HOST")
-	}
-
-	if len(conf.URL) > 0 && len(conf.Token) > 0 {
-		common.Logger.Printf("Direct connetion to Wavefront: %s", conf.URL)
-		directCfg := &senders.DirectConfiguration{
-			Server:               strings.Trim(conf.URL, " "),
-			Token:                strings.Trim(conf.Token, " "),
-			BatchSize:            conf.BatchSize,
-			MaxBufferSize:        conf.MaxBufferSize,
-			FlushIntervalSeconds: conf.FlushInterval,
-		}
-		sender, err = senders.NewDirectSender(directCfg)
-		if err != nil {
-			common.Logger.Fatal(err)
-		}
-	} else if len(conf.ProxyAddr) > 0 && conf.ProxyPort > 0 {
-		common.Logger.Printf("Connecting to Wavefront proxy: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
-		proxyCfg := &senders.ProxyConfiguration{
-			Host:                 strings.Trim(conf.ProxyAddr, " "),
-			MetricsPort:          conf.ProxyPort,
-			FlushIntervalSeconds: conf.FlushInterval,
-		}
-		sender, err = senders.NewProxySender(proxyCfg)
-		if err != nil {
-			common.Logger.Fatal(err)
-		}
-	} else {
-		common.Logger.Printf("Direct configuration: %s", conf.URL)
-		common.Logger.Printf("Proxy configuration: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
-		common.Logger.Fatal(errors.New("No Wavefront configuration detected"))
-	}
-
-	reporter := reporting.NewReporter(
-		sender,
-		application.New("pcf-nozzle", "internal-metrics"),
-		reporting.Prefix("wavefront-firehose-nozzle.app"),
-	)
+	wf := common.NewWavefront(conf)
 
 	internalTags := common.GetInternalTags()
 	common.Logger.Printf("internalTags: %v", internalTags)
 
-	numMetricsSent := newCounter("total-metrics-sent", internalTags)
-	metricsSendFailure := newCounter("metrics-send-failure", internalTags)
-	metricsFiltered := newCounter("metrics-filtered", internalTags)
 	numGaugeMetricReceived := newCounter("value-metric-received", internalTags)
 	numCounterEventReceived := newCounter("counter-event-received", internalTags)
-	numContainerMetricReceived := newCounter("container-metric-received", internalTags)
-	handleErrorMetric := newCounter("firehose-connection-error", internalTags)
 
 	ev := &EventHandler{
-		sender:                     sender,
-		reporter:                   reporter,
-		prefix:                     strings.Trim(conf.Prefix, " "),
-		foundation:                 strings.Trim(conf.Foundation, " "),
-		filter:                     common.NewGlobFilter(conf.Filters),
-		numMetricsSent:             numMetricsSent,
-		metricsSendFailure:         metricsSendFailure,
-		metricsFiltered:            metricsFiltered,
-		numGaugeMetricReceived:     numGaugeMetricReceived,
-		numCounterEventReceived:    numCounterEventReceived,
-		numContainerMetricReceived: numContainerMetricReceived,
-		handleErrorMetric:          handleErrorMetric,
+		wf:                      wf,
+		prefix:                  strings.Trim(conf.Prefix, " "),
+		foundation:              strings.Trim(conf.Foundation, " "),
+		numGaugeMetricReceived:  numGaugeMetricReceived,
+		numCounterEventReceived: numCounterEventReceived,
 	}
-	ev.startHealthReport()
 	return ev
 }
 
@@ -142,8 +78,8 @@ func (w *EventHandler) BuildCounterEvent(event *loggregator_v2.Envelope) {
 	total := event.GetCounter().GetTotal()
 	delta := event.GetCounter().GetDelta()
 
-	w.sendMetric(metricName+".total", float64(total), ts, source, tags)
-	w.sendMetric(metricName+".delta", float64(delta), ts, source, tags)
+	w.wf.SendMetric(metricName+".total", float64(total), ts, source, tags)
+	w.wf.SendMetric(metricName+".delta", float64(delta), ts, source, tags)
 }
 
 //BuildGaugeEvent parse and report metrics
@@ -158,13 +94,12 @@ func (w *EventHandler) BuildGaugeEvent(event *loggregator_v2.Envelope) {
 		metricName += "." + event.GetTags()["origin"]
 		metricName += "." + name
 
-		// common.Logger.Println("metricName:", metricName)
+		common.Logger.Println("metricName:", metricName)
 
 		source, tags, ts := w.getMetricInfo(event)
 
-		w.sendMetric(metricName+"."+metric.GetUnit(), metric.Value, ts, source, tags)
+		w.wf.SendMetric(metricName+"."+metric.GetUnit(), metric.Value, ts, source, tags)
 	}
-
 }
 
 //BuildContainerEvent parse and report metrics
@@ -239,45 +174,7 @@ func (w *EventHandler) getTags(event *loggregator_v2.Envelope) map[string]string
 	return tags
 }
 
-func (w *EventHandler) sendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
-	if trace {
-		line, err := senders.MetricLine(name, value, ts, source, tags, "")
-		if err != nil {
-			common.Logger.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
-		}
-
-		status := "filtered"
-		if w.filter.Match(name, tags) {
-			status = "accepted"
-		}
-		common.Logger.Printf("[DEBUG] [%s] metric: %s", status, line)
-	}
-
-	if w.filter.Match(name, tags) {
-		err := w.sender.SendMetric(name, value, ts, source, tags)
-		if err != nil {
-			w.metricsSendFailure.Inc(1)
-			if common.Debug {
-				common.Logger.Printf("[ERROR] error sending the metric '%s': %v", name, err)
-			}
-		} else {
-			w.numMetricsSent.Inc(1)
-		}
-	} else {
-		w.metricsFiltered.Inc(1)
-	}
-}
-
 //ReportError increments the error counter
 func (w *EventHandler) ReportError(err error) {
-	w.handleErrorMetric.Inc(1)
-}
-
-func (w *EventHandler) startHealthReport() {
-	ticker := time.NewTicker(time.Minute)
-	go func() {
-		for range ticker.C {
-			common.Logger.Printf("total metrics sent: %d  filtered: %d  failures: %d", w.numMetricsSent.Count(), w.metricsFiltered.Count(), w.metricsSendFailure.Count())
-		}
-	}()
+	w.wf.ReportError(err)
 }
