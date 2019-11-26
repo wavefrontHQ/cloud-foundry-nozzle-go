@@ -18,9 +18,9 @@ type Nozzle struct {
 }
 
 // NewNozzle create a new Nozzle
-func NewNozzle(conf *common.Config) *Nozzle {
+func NewNozzle(conf *common.Config, api *common.APIClient) *Nozzle {
 	nozzle := &Nozzle{
-		eventSerializer: CreateEventHandler(conf.Wavefront),
+		eventSerializer: CreateEventHandler(conf.Wavefront, api),
 		EventsChannel:   make(chan *loggregator_v2.Envelope, 1000),
 		ErrorsChannel:   make(chan error),
 	}

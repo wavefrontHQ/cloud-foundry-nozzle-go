@@ -17,7 +17,7 @@ func Run(conf *common.Config) {
 		var trafficControllerURL string
 		common.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
 
-		api, err := NewAPIClient(conf.Nozzle)
+		api, err := common.NewAPIClient(conf.Nozzle)
 		if err != nil {
 			common.Logger.Fatal("[ERROR] Unable to build API client: ", err)
 		}

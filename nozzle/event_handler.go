@@ -15,7 +15,8 @@ var trace = os.Getenv("WAVEFRONT_TRACE") == "true"
 
 // EventHandler receive CF events and send metrics to WF
 type EventHandler struct {
-	wf common.Wavefront
+	wf  common.Wavefront
+	api *common.APIClient
 
 	prefix     string
 	foundation string
@@ -25,7 +26,7 @@ type EventHandler struct {
 }
 
 // CreateEventHandler create a new EventHandler
-func CreateEventHandler(conf *common.WavefrontConfig) *EventHandler {
+func CreateEventHandler(conf *common.WavefrontConfig, api *common.APIClient) *EventHandler {
 	wf := common.NewWavefront(conf)
 
 	internalTags := common.GetInternalTags()
@@ -40,6 +41,7 @@ func CreateEventHandler(conf *common.WavefrontConfig) *EventHandler {
 		foundation:              strings.Trim(conf.Foundation, " "),
 		numGaugeMetricReceived:  numGaugeMetricReceived,
 		numCounterEventReceived: numCounterEventReceived,
+		api:                     api,
 	}
 	return ev
 }
@@ -92,26 +94,38 @@ func (w *EventHandler) BuildCounterEvent(event *loggregator_v2.Envelope) {
 // > [WAVEFRONT] metricName: pcf.container.rep.disk.bytes
 // > [WAVEFRONT] metricName: pcf.container.rep.disk_quota.bytes
 // > [WAVEFRONT] metricName: pcf.container.rep.memory.bytes
-// > [WAVEFRONT] metricName: pcf.container.rep.memoryStats.lastGCPauseTimeNS.ns
-// > [WAVEFRONT] metricName: pcf.container.rep.memoryStats.numBytesAllocatedHeap.Bytes
-// > [WAVEFRONT] metricName: pcf.container.rep.memoryStats.numBytesAllocatedStack.Bytes
 // > [WAVEFRONT] metricName: pcf.container.rep.memory_quota.bytes
+
+var translateStrs = map[string]string{
+	"pcf.container.rep.cpu.percentage":     "pcf.container.rep.cpu_percentage",
+	"pcf.container.rep.disk.bytes":         "pcf.container.rep.disk_bytes",
+	"pcf.container.rep.disk_quota.bytes":   "pcf.container.rep.disk_bytes_quota",
+	"pcf.container.rep.memory.bytes":       "pcf.container.rep.memory_bytes",
+	"pcf.container.rep.memory_quota.bytes": "pcf.container.rep.memory_bytes_quota",
+}
 
 //BuildGaugeEvent parse and report metrics
 func (w *EventHandler) BuildGaugeEvent(event *loggregator_v2.Envelope) {
 	w.numGaugeMetricReceived.Inc(1)
 
 	for name, metric := range event.GetGauge().GetMetrics() {
+		translate := false
 		metricName := w.prefix
 		if event.GetTags()["origin"] == "rep" {
 			metricName += ".container"
+			translate = true
 		}
 		metricName += "." + event.GetTags()["origin"]
-		metricName += "." + name
+		metricName += "." + name + "." + metric.GetUnit()
+
+		if translate {
+			if newName, ok := translateStrs[metricName]; ok {
+				metricName = newName
+			}
+		}
 
 		source, tags, ts := w.getMetricInfo(event)
-
-		w.wf.SendMetric(metricName+"."+metric.GetUnit(), metric.Value, ts, source, tags)
+		w.wf.SendMetric(metricName, metric.Value, ts, source, tags)
 	}
 }
 
@@ -169,12 +183,24 @@ func (w *EventHandler) getSource(event *loggregator_v2.Envelope) string {
 func (w *EventHandler) getTags(event *loggregator_v2.Envelope) map[string]string {
 	tags := make(map[string]string)
 
-	if deployment := event.GetTags()["deployment"]; len(deployment) > 0 {
+	if deployment, ok := event.GetTags()["deployment"]; ok {
 		tags["deployment"] = deployment
 	}
 
-	if job := event.GetTags()["job"]; len(job) > 0 {
+	if job, ok := event.GetTags()["job"]; ok {
 		tags["job"] = job
+	}
+
+	if event.GetTags()["origin"] == "rep" {
+		if sourceID, ok := event.GetTags()["source_id"]; ok {
+			app, err := w.api.GetApp(sourceID)
+			if err != nil {
+				common.Logger.Printf("Error on gettin app name: %v", err)
+			}
+			tags["applicationName"] = app.Name
+			tags["org"] = app.Org
+			tags["space"] = app.Space
+		}
 	}
 
 	tags["foundation"] = w.foundation

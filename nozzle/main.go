@@ -43,44 +43,38 @@ var allSelectors = []*loggregator_v2.Selector{
 
 func Run(conf *common.Config) {
 	for {
-		uaaClient, err := NewUAA(conf.Nozzle.APIURL, conf.Nozzle.Username, conf.Nozzle.Password, true)
+		common.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
+
+		api, err := common.NewAPIClient(conf.Nozzle)
 		if err != nil {
-			panic(err)
+			common.Logger.Fatal("[ERROR] Unable to build API client: ", err)
 		}
 
-		err = receive(conf, uaaClient)
+		token, err := api.FetchAuthToken()
 		if err != nil {
-			common.Logger.Println("ERROR !!!", err)
+			common.Logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
+		}
+
+		wfnozzle := NewNozzle(conf, api)
+		c := loggregator.NewRLPGatewayClient(
+			conf.Nozzle.LogStreamURL,
+			loggregator.WithRLPGatewayClientLogger(common.Logger),
+			loggregator.WithRLPGatewayHTTPClient(&tokenAttacher{
+				token: token,
+			}),
+		)
+
+		es := c.Stream(context.Background(), &loggregator_v2.EgressBatchRequest{
+			Selectors: allSelectors,
+		})
+
+		for {
+			for _, e := range es() {
+				wfnozzle.EventsChannel <- e
+			}
 		}
 		common.Logger.Println("Reconnecting")
 	}
-}
-
-func receive(conf *common.Config, uaaClient UAA) error {
-	wfnozzle := NewNozzle(conf)
-	token, err := uaaClient.GetAuthToken()
-	if err != nil {
-		return err
-	}
-
-	c := loggregator.NewRLPGatewayClient(
-		conf.Nozzle.LogStreamURL,
-		loggregator.WithRLPGatewayClientLogger(common.Logger),
-		loggregator.WithRLPGatewayHTTPClient(&tokenAttacher{
-			token: token,
-		}),
-	)
-
-	es := c.Stream(context.Background(), &loggregator_v2.EgressBatchRequest{
-		Selectors: allSelectors,
-	})
-
-	for {
-		for _, e := range es() {
-			wfnozzle.EventsChannel <- e
-		}
-	}
-
 }
 
 func printError(err error) {

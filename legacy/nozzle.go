@@ -19,11 +19,11 @@ var defaultEvents = []events.Envelope_EventType{
 type Nozzle struct {
 	EventsChannel chan *events.Envelope
 	ErrorsChannel chan error
-	APIClient     *APIClient
+	APIClient     *common.APIClient
 
 	eventSerializer    *EventHandler
 	includedEventTypes map[events.Envelope_EventType]bool
-	appsInfo           map[string]*AppInfo
+	appsInfo           map[string]*common.AppInfo
 }
 
 // NewNozzle create a new Nozzle

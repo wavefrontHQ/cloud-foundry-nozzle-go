@@ -77,7 +77,7 @@ func (w *EventHandler) BuildCounterEvent(event *events.Envelope) {
 }
 
 //BuildContainerEvent parse and report metrics
-func (w *EventHandler) BuildContainerEvent(event *events.Envelope, appInfo *AppInfo) {
+func (w *EventHandler) BuildContainerEvent(event *events.Envelope, appInfo *common.AppInfo) {
 	w.numContainerMetricReceived.Inc(1)
 
 	metricName := w.prefix + ".container." + event.GetOrigin()
