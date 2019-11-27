@@ -50,27 +50,14 @@ func newCounter(name string, tags map[string]string) metrics.Counter {
 	return reporting.GetOrRegisterMetric(name, metrics.NewCounter(), tags).(metrics.Counter)
 }
 
-// //BuildValueMetricEvent parse and report metrics
-// func (w *EventHandler) BuildValueMetricEvent(event *loggregator_v2.Envelope) {
-// 	w.numValueMetricReceived.Inc(1)
-
-// 	metricName := w.prefix
-// 	metricName += "." + event.GetOrigin()
-// 	metricName += "." + event.GetValueMetric().GetName()
-// 	metricName += "." + event.GetValueMetric().GetUnit()
-// 	source, tags, ts := w.getMetricInfo(event)
-
-// 	value := event.GetValueMetric().GetValue()
-
-// 	w.sendMetric(metricName, value, ts, source, tags)
-// }
-
 //BuildCounterEvent parse and report metrics
 func (w *EventHandler) BuildCounterEvent(event *loggregator_v2.Envelope) {
 	w.numCounterEventReceived.Inc(1)
 
 	metricName := w.prefix
-	metricName += "." + event.GetTags()["origin"]
+	if len(event.GetTags()["origin"]) > 0 {
+		metricName += "." + event.GetTags()["origin"]
+	}
 	metricName += "." + event.GetCounter().GetName()
 
 	// common.Logger.Println("metricName:", metricName)
@@ -83,18 +70,6 @@ func (w *EventHandler) BuildCounterEvent(event *loggregator_v2.Envelope) {
 	w.wf.SendMetric(metricName+".total", float64(total), ts, source, tags)
 	w.wf.SendMetric(metricName+".delta", float64(delta), ts, source, tags)
 }
-
-// < [WAVEFRONT] metricName: pcf.container.rep.cpu_percentage
-// < [WAVEFRONT] metricName: pcf.container.rep.disk_bytes
-// < [WAVEFRONT] metricName: pcf.container.rep.disk_bytes_quota
-// < [WAVEFRONT] metricName: pcf.container.rep.memory_bytes
-// < [WAVEFRONT] metricName: pcf.container.rep.memory_bytes_quota
-
-// > [WAVEFRONT] metricName: pcf.container.rep.cpu.percentage
-// > [WAVEFRONT] metricName: pcf.container.rep.disk.bytes
-// > [WAVEFRONT] metricName: pcf.container.rep.disk_quota.bytes
-// > [WAVEFRONT] metricName: pcf.container.rep.memory.bytes
-// > [WAVEFRONT] metricName: pcf.container.rep.memory_quota.bytes
 
 var translateStrs = map[string]string{
 	"pcf.container.rep.cpu.percentage":     "pcf.container.rep.cpu_percentage",
@@ -111,12 +86,19 @@ func (w *EventHandler) BuildGaugeEvent(event *loggregator_v2.Envelope) {
 	for name, metric := range event.GetGauge().GetMetrics() {
 		translate := false
 		metricName := w.prefix
-		if event.GetTags()["origin"] == "rep" {
+		if _, ok := event.GetTags()["source_id"]; ok {
 			metricName += ".container"
 			translate = true
 		}
-		metricName += "." + event.GetTags()["origin"]
-		metricName += "." + name + "." + metric.GetUnit()
+
+		if len(event.GetTags()["origin"]) > 0 {
+			metricName += "." + event.GetTags()["origin"]
+		}
+
+		metricName += "." + name
+		if len(metric.GetUnit()) > 0 {
+			metricName += "." + metric.GetUnit()
+		}
 
 		if translate {
 			if newName, ok := translateStrs[metricName]; ok {
@@ -128,34 +110,6 @@ func (w *EventHandler) BuildGaugeEvent(event *loggregator_v2.Envelope) {
 		w.wf.SendMetric(metricName, metric.Value, ts, source, tags)
 	}
 }
-
-//BuildContainerEvent parse and report metrics
-// func (w *EventHandler) BuildContainerEvent(event *loggregator_v2.Envelope, appInfo *AppInfo) {
-// 	w.numContainerMetricReceived.Inc(1)
-
-// 	metricName := w.prefix + ".container." + event.GetOrigin()
-// 	source, tags, ts := w.getMetricInfo(event)
-
-// 	tags["applicationId"] = event.GetContainerMetric().GetApplicationId()
-// 	tags["instanceIndex"] = fmt.Sprintf("%d", event.GetContainerMetric().GetInstanceIndex())
-// 	if appInfo != nil {
-// 		tags["applicationName"] = appInfo.Name
-// 		tags["space"] = appInfo.Space
-// 		tags["org"] = appInfo.Org
-// 	}
-
-// 	cpuPercentage := event.GetContainerMetric().GetCpuPercentage()
-// 	diskBytes := event.GetContainerMetric().GetDiskBytes()
-// 	diskBytesQuota := event.GetContainerMetric().GetDiskBytesQuota()
-// 	memoryBytes := event.GetContainerMetric().GetMemoryBytes()
-// 	memoryBytesQuota := event.GetContainerMetric().GetMemoryBytesQuota()
-
-// 	w.sendMetric(metricName+".cpu_percentage", cpuPercentage, ts, source, tags)
-// 	w.sendMetric(metricName+".disk_bytes", float64(diskBytes), ts, source, tags)
-// 	w.sendMetric(metricName+".disk_bytes_quota", float64(diskBytesQuota), ts, source, tags)
-// 	w.sendMetric(metricName+".memory_bytes", float64(memoryBytes), ts, source, tags)
-// 	w.sendMetric(metricName+".memory_bytes_quota", float64(memoryBytesQuota), ts, source, tags)
-// }
 
 func (w *EventHandler) getMetricInfo(event *loggregator_v2.Envelope) (string, map[string]string, int64) {
 	source := w.getSource(event)

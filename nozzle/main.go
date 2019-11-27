@@ -14,66 +14,63 @@ import (
 )
 
 var allSelectors = []*loggregator_v2.Selector{
-	{
-		Message: &loggregator_v2.Selector_Log{
-			Log: &loggregator_v2.LogSelector{},
-		},
-	},
-	{
-		Message: &loggregator_v2.Selector_Counter{
-			Counter: &loggregator_v2.CounterSelector{},
-		},
-	},
-	{
-		Message: &loggregator_v2.Selector_Gauge{
-			Gauge: &loggregator_v2.GaugeSelector{},
-		},
-	},
+	// {
+	// 	Message: &loggregator_v2.Selector_Log{
+	// 		Log: &loggregator_v2.LogSelector{},
+	// 	},
+	// },
+	// {
+	// 	Message: &loggregator_v2.Selector_Counter{
+	// 		Counter: &loggregator_v2.CounterSelector{},
+	// 	},
+	// },
+	// {
+	// 	Message: &loggregator_v2.Selector_Gauge{
+	// 		Gauge: &loggregator_v2.GaugeSelector{},
+	// 	},
+	// },
 	{
 		Message: &loggregator_v2.Selector_Timer{
 			Timer: &loggregator_v2.TimerSelector{},
 		},
 	},
-	{
-		Message: &loggregator_v2.Selector_Event{
-			Event: &loggregator_v2.EventSelector{},
-		},
-	},
+	// {
+	// 	Message: &loggregator_v2.Selector_Event{
+	// 		Event: &loggregator_v2.EventSelector{},
+	// 	},
+	// },
 }
 
 func Run(conf *common.Config) {
+	common.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
+
+	api, err := common.NewAPIClient(conf.Nozzle)
+	if err != nil {
+		common.Logger.Fatal("[ERROR] Unable to build API client: ", err)
+	}
+
+	token, err := api.FetchAuthToken()
+	if err != nil {
+		common.Logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
+	}
+
+	wfnozzle := NewNozzle(conf, api)
+	c := loggregator.NewRLPGatewayClient(
+		conf.Nozzle.LogStreamURL,
+		loggregator.WithRLPGatewayClientLogger(common.Logger),
+		loggregator.WithRLPGatewayHTTPClient(&tokenAttacher{
+			token: token,
+		}),
+	)
+
+	es := c.Stream(context.Background(), &loggregator_v2.EgressBatchRequest{
+		Selectors: allSelectors,
+	})
+
 	for {
-		common.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
-
-		api, err := common.NewAPIClient(conf.Nozzle)
-		if err != nil {
-			common.Logger.Fatal("[ERROR] Unable to build API client: ", err)
+		for _, e := range es() {
+			wfnozzle.EventsChannel <- e
 		}
-
-		token, err := api.FetchAuthToken()
-		if err != nil {
-			common.Logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
-		}
-
-		wfnozzle := NewNozzle(conf, api)
-		c := loggregator.NewRLPGatewayClient(
-			conf.Nozzle.LogStreamURL,
-			loggregator.WithRLPGatewayClientLogger(common.Logger),
-			loggregator.WithRLPGatewayHTTPClient(&tokenAttacher{
-				token: token,
-			}),
-		)
-
-		es := c.Stream(context.Background(), &loggregator_v2.EgressBatchRequest{
-			Selectors: allSelectors,
-		})
-
-		for {
-			for _, e := range es() {
-				wfnozzle.EventsChannel <- e
-			}
-		}
-		common.Logger.Println("Reconnecting")
 	}
 }
 

@@ -109,8 +109,6 @@ func (w *wavefront) SendMetric(name string, value float64, ts int64, source stri
 		Logger.Printf("[DEBUG] [%s] metric: %s", status, line)
 	}
 
-	// Logger.Println("metricName:", name)
-
 	if w.filter.Match(name, tags) {
 		err := w.sender.SendMetric(name, value, ts, source, tags)
 		if err != nil {
