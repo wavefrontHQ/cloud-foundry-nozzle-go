@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	metrics "github.com/rcrowley/go-metrics"
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
 	cache "github.com/patrickmn/go-cache"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 // APIClient wrapper for Cloud Foundry Client
