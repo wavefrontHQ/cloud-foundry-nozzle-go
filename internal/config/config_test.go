@@ -1,4 +1,4 @@
-package common_test
+package config_test
 
 import (
 	"log"

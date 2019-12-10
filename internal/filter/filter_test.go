@@ -1,4 +1,4 @@
-package common_test
+package filter_test
 
 import (
 	"os"

@@ -1,4 +1,4 @@
-package common
+package config
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/filter"
 )
 
 // Config holds users provided env variables
@@ -48,7 +49,7 @@ type WavefrontConfig struct {
 	Prefix        string `required:"true" envconfig:"PREFIX"`
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
 
-	Filters *Filters `ignored:"true"`
+	Filters *filter.Filters `ignored:"true"`
 }
 
 type advancedConfig struct {
@@ -75,8 +76,8 @@ type filtersConfig struct {
 	MetricsBlackList []string `split_words:"true"`
 	MetricsWhiteList []string `split_words:"true"`
 
-	MetricsTagBlackList TagFilter `split_words:"true"`
-	MetricsTagWhiteList TagFilter `split_words:"true"`
+	MetricsTagBlackList filter.TagFilter `split_words:"true"`
+	MetricsTagWhiteList filter.TagFilter `split_words:"true"`
 
 	TagInclude []string `split_words:"true"`
 	TagExclude []string `split_words:"true"`
@@ -122,7 +123,7 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
-	wavefrontConfig.Filters = &Filters{
+	wavefrontConfig.Filters = &filter.Filters{
 		MetricsBlackList:    f.MetricsBlackList,
 		MetricsWhiteList:    f.MetricsWhiteList,
 		MetricsTagBlackList: f.MetricsTagBlackList,

@@ -1,4 +1,4 @@
-package common_test
+package utils_test
 
 import (
 	"os"

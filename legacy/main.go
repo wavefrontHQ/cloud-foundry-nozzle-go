@@ -7,34 +7,36 @@ import (
 	"github.com/cloudfoundry/noaa/consumer"
 	noaaerrors "github.com/cloudfoundry/noaa/errors"
 	"github.com/gorilla/websocket"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/common"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/api"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
 )
 
-func Run(conf *common.Config) {
+func Run(conf *config.Config) {
 	nozzle := NewNozzle(conf)
 
 	for {
 		var trafficControllerURL string
-		common.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
+		utils.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
 
-		api, err := common.NewAPIClient(conf.Nozzle)
+		api, err := api.NewAPIClient(conf.Nozzle)
 		if err != nil {
-			common.Logger.Fatal("[ERROR] Unable to build API client: ", err)
+			utils.Logger.Fatal("[ERROR] Unable to build API client: ", err)
 		}
 
 		nozzle.APIClient = api
 
 		token, err := api.FetchAuthToken()
 		if err != nil {
-			common.Logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
+			utils.Logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
 		}
 
 		trafficControllerURL = api.FetchTrafficControllerURL()
 		if trafficControllerURL == "" {
-			common.Logger.Fatal("[ERROR] trafficControllerURL from client was blank")
+			utils.Logger.Fatal("[ERROR] trafficControllerURL from client was blank")
 		}
 
-		common.Logger.Printf("Consuming firehose: %v\n", trafficControllerURL)
+		utils.Logger.Printf("Consuming firehose: %v\n", trafficControllerURL)
 		noaaConsumer := consumer.New(trafficControllerURL, &tls.Config{
 			InsecureSkipVerify: conf.Nozzle.SkipSSL,
 		}, nil)
@@ -57,7 +59,7 @@ func Run(conf *common.Config) {
 		<-done
 
 		noaaConsumer.Close()
-		common.Logger.Println("Reconnecting")
+		utils.Logger.Println("Reconnecting")
 	}
 }
 
@@ -68,8 +70,8 @@ func printError(err error) {
 
 	switch closeErr := err.(type) {
 	case *websocket.CloseError:
-		common.Logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
+		utils.Logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
 	default:
-		common.Logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
+		utils.Logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
 	}
 }

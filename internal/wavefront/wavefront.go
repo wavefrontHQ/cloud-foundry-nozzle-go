@@ -1,4 +1,4 @@
-package common
+package wavefront
 
 import (
 	"errors"
@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/rcrowley/go-metrics"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/filter"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
 	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 	"github.com/wavefronthq/wavefront-sdk-go/application"
 	"github.com/wavefronthq/wavefront-sdk-go/senders"
@@ -22,7 +25,7 @@ type Wavefront interface {
 type wavefront struct {
 	sender   senders.Sender
 	reporter reporting.WavefrontMetricsReporter
-	filter   Filter
+	filter   filter.Filter
 
 	numMetricsSent     metrics.Counter
 	metricsSendFailure metrics.Counter
@@ -30,7 +33,7 @@ type wavefront struct {
 	handleErrorMetric  metrics.Counter
 }
 
-func NewWavefront(conf *WavefrontConfig) Wavefront {
+func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 	var sender senders.Sender
 	var err error
 
@@ -39,7 +42,7 @@ func NewWavefront(conf *WavefrontConfig) Wavefront {
 	}
 
 	if len(conf.URL) > 0 && len(conf.Token) > 0 {
-		Logger.Printf("Direct connetion to Wavefront: %s", conf.URL)
+		utils.Logger.Printf("Direct connetion to Wavefront: %s", conf.URL)
 		directCfg := &senders.DirectConfiguration{
 			Server:               strings.Trim(conf.URL, " "),
 			Token:                strings.Trim(conf.Token, " "),
@@ -49,10 +52,10 @@ func NewWavefront(conf *WavefrontConfig) Wavefront {
 		}
 		sender, err = senders.NewDirectSender(directCfg)
 		if err != nil {
-			Logger.Fatal(err)
+			utils.Logger.Fatal(err)
 		}
 	} else if len(conf.ProxyAddr) > 0 && conf.ProxyPort > 0 {
-		Logger.Printf("Connecting to Wavefront proxy: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
+		utils.Logger.Printf("Connecting to Wavefront proxy: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
 		proxyCfg := &senders.ProxyConfiguration{
 			Host:                 strings.Trim(conf.ProxyAddr, " "),
 			MetricsPort:          conf.ProxyPort,
@@ -60,16 +63,16 @@ func NewWavefront(conf *WavefrontConfig) Wavefront {
 		}
 		sender, err = senders.NewProxySender(proxyCfg)
 		if err != nil {
-			Logger.Fatal(err)
+			utils.Logger.Fatal(err)
 		}
 	} else {
-		Logger.Printf("Direct configuration: %s", conf.URL)
-		Logger.Printf("Proxy configuration: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
-		Logger.Fatal(errors.New("No Wavefront configuration detected"))
+		utils.Logger.Printf("Direct configuration: %s", conf.URL)
+		utils.Logger.Printf("Proxy configuration: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
+		utils.Logger.Fatal(errors.New("No Wavefront configuration detected"))
 	}
 
-	internalTags := GetInternalTags()
-	Logger.Printf("internalTags: %v", internalTags)
+	internalTags := utils.GetInternalTags()
+	utils.Logger.Printf("internalTags: %v", internalTags)
 
 	numMetricsSent := NewCounter("total-metrics-sent", internalTags)
 	metricsSendFailure := NewCounter("metrics-send-failure", internalTags)
@@ -84,7 +87,7 @@ func NewWavefront(conf *WavefrontConfig) Wavefront {
 
 	wf := &wavefront{
 		sender:             sender,
-		filter:             NewGlobFilter(conf.Filters),
+		filter:             filter.NewGlobFilter(conf.Filters),
 		reporter:           reporter,
 		numMetricsSent:     numMetricsSent,
 		metricsSendFailure: metricsSendFailure,
@@ -99,22 +102,22 @@ func (w *wavefront) SendMetric(name string, value float64, ts int64, source stri
 	if trace {
 		line, err := senders.MetricLine(name, value, ts, source, tags, "")
 		if err != nil {
-			Logger.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
+			utils.Logger.Printf("[ERROR] error preparing the metric '%s': %v", name, err)
 		}
 
 		status := "filtered"
 		if w.filter.Match(name, tags) {
 			status = "accepted"
 		}
-		Logger.Printf("[DEBUG] [%s] metric: %s", status, line)
+		utils.Logger.Printf("[DEBUG] [%s] metric: %s", status, line)
 	}
 
 	if w.filter.Match(name, tags) {
 		err := w.sender.SendMetric(name, value, ts, source, tags)
 		if err != nil {
 			w.metricsSendFailure.Inc(1)
-			if Debug {
-				Logger.Printf("[ERROR] error sending the metric '%s': %v", name, err)
+			if utils.Debug {
+				utils.Logger.Printf("[ERROR] error sending the metric '%s': %v", name, err)
 			}
 		} else {
 			w.numMetricsSent.Inc(1)
@@ -128,7 +131,7 @@ func (w *wavefront) startHealthReport() {
 	ticker := time.NewTicker(time.Minute)
 	go func() {
 		for range ticker.C {
-			Logger.Printf("total metrics sent: %d  filtered: %d  failures: %d", w.numMetricsSent.Count(), w.metricsFiltered.Count(), w.metricsSendFailure.Count())
+			utils.Logger.Printf("total metrics sent: %d  filtered: %d  failures: %d", w.numMetricsSent.Count(), w.metricsFiltered.Count(), w.metricsSendFailure.Count())
 		}
 	}()
 }

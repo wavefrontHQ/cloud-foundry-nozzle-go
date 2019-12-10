@@ -5,7 +5,9 @@ import (
 
 	"github.com/cloudfoundry/sonde-go/events"
 	metrics "github.com/rcrowley/go-metrics"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/common"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/api"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
 	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
@@ -19,15 +21,15 @@ var defaultEvents = []events.Envelope_EventType{
 type Nozzle struct {
 	EventsChannel chan *events.Envelope
 	ErrorsChannel chan error
-	APIClient     *common.APIClient
+	APIClient     *api.APIClient
 
 	eventSerializer    *EventHandler
 	includedEventTypes map[events.Envelope_EventType]bool
-	appsInfo           map[string]*common.AppInfo
+	appsInfo           map[string]*api.AppInfo
 }
 
 // NewNozzle create a new Nozzle
-func NewNozzle(conf *common.Config) *Nozzle {
+func NewNozzle(conf *config.Config) *Nozzle {
 	nozzle := &Nozzle{
 		eventSerializer: CreateEventHandler(conf.Wavefront),
 		EventsChannel:   make(chan *events.Envelope, 1000),
@@ -47,7 +49,7 @@ func NewNozzle(conf *common.Config) *Nozzle {
 		nozzle.includedEventTypes[selectedEventType] = true
 	}
 
-	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(nozzle.queueSize), common.GetInternalTags())
+	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(nozzle.queueSize), utils.GetInternalTags())
 
 	go nozzle.run()
 	return nozzle
@@ -83,12 +85,12 @@ func (s *Nozzle) handleEvent(envelope *events.Envelope) {
 		appGuIG := envelope.GetContainerMetric().GetApplicationId()
 		if s.APIClient != nil {
 			appInfo, err := s.APIClient.GetApp(appGuIG)
-			if err != nil && common.Debug {
-				common.Logger.Print("[ERROR]", err)
+			if err != nil && utils.Debug {
+				utils.Logger.Print("[ERROR]", err)
 			}
 			s.eventSerializer.BuildContainerEvent(envelope, appInfo)
 		} else {
-			common.Logger.Fatal("[ERROR] APIClient is null")
+			utils.Logger.Fatal("[ERROR] APIClient is null")
 		}
 	}
 }
@@ -110,7 +112,7 @@ func ParseSelectedEvents(orgEnvValue string) []events.Envelope_EventType {
 		if found {
 			selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
 		} else {
-			common.Logger.Panicf("[%s] is not a valid event type", orgEnvValue)
+			utils.Logger.Panicf("[%s] is not a valid event type", orgEnvValue)
 		}
 	}
 

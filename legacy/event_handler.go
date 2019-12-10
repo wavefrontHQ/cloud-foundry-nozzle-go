@@ -8,12 +8,15 @@ import (
 	metrics "github.com/rcrowley/go-metrics"
 
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/common"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/api"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/wavefront"
 )
 
 // EventHandler receive CF events and send metrics to WF
 type EventHandler struct {
-	wf common.Wavefront
+	wf wavefront.Wavefront
 
 	prefix     string
 	foundation string
@@ -24,15 +27,15 @@ type EventHandler struct {
 }
 
 // CreateEventHandler create a new EventHandler
-func CreateEventHandler(conf *common.WavefrontConfig) *EventHandler {
-	wf := common.NewWavefront(conf)
+func CreateEventHandler(conf *config.WavefrontConfig) *EventHandler {
+	wf := wavefront.NewWavefront(conf)
 
-	internalTags := common.GetInternalTags()
-	common.Logger.Printf("internalTags: %v", internalTags)
+	internalTags := utils.GetInternalTags()
+	utils.Logger.Printf("internalTags: %v", internalTags)
 
-	numValueMetricReceived := common.NewCounter("value-metric-received", internalTags)
-	numCounterEventReceived := common.NewCounter("counter-event-received", internalTags)
-	numContainerMetricReceived := common.NewCounter("container-metric-received", internalTags)
+	numValueMetricReceived := wavefront.NewCounter("value-metric-received", internalTags)
+	numCounterEventReceived := wavefront.NewCounter("counter-event-received", internalTags)
+	numContainerMetricReceived := wavefront.NewCounter("container-metric-received", internalTags)
 
 	ev := &EventHandler{
 		wf:                         wf,
@@ -77,7 +80,7 @@ func (w *EventHandler) BuildCounterEvent(event *events.Envelope) {
 }
 
 //BuildContainerEvent parse and report metrics
-func (w *EventHandler) BuildContainerEvent(event *events.Envelope, appInfo *common.AppInfo) {
+func (w *EventHandler) BuildContainerEvent(event *events.Envelope, appInfo *api.AppInfo) {
 	w.numContainerMetricReceived.Inc(1)
 
 	metricName := w.prefix + ".container." + event.GetOrigin()

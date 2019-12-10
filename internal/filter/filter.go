@@ -1,4 +1,4 @@
-package common
+package filter
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gobwas/glob"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
 )
 
 // Filter will compare metrics names and tags against regex
@@ -58,12 +59,12 @@ func NewGlobFilter(cfg *Filters) Filter {
 	cfg.TagInclude = cleanUp(cfg.TagInclude)
 	cfg.TagExclude = cleanUp(cfg.TagExclude)
 
-	Logger.Printf("filters: MetricsWhiteList = '%v", cfg.MetricsWhiteList)
-	Logger.Printf("filters: MetricsBlackList = '%v", cfg.MetricsBlackList)
-	Logger.Printf("filters: MetricsTagWhiteList = '%v", cfg.MetricsTagWhiteList)
-	Logger.Printf("filters: MetricsTagBlackList = '%v", cfg.MetricsTagBlackList)
-	Logger.Printf("filters: TagInclude = '%v", cfg.TagInclude)
-	Logger.Printf("filters: TagExclude = '%v", cfg.TagExclude)
+	utils.Logger.Printf("filters: MetricsWhiteList = '%v", cfg.MetricsWhiteList)
+	utils.Logger.Printf("filters: MetricsBlackList = '%v", cfg.MetricsBlackList)
+	utils.Logger.Printf("filters: MetricsTagWhiteList = '%v", cfg.MetricsTagWhiteList)
+	utils.Logger.Printf("filters: MetricsTagBlackList = '%v", cfg.MetricsTagBlackList)
+	utils.Logger.Printf("filters: TagInclude = '%v", cfg.TagInclude)
+	utils.Logger.Printf("filters: TagExclude = '%v", cfg.TagExclude)
 
 	return &globFilter{
 		metricWhitelist:    compile(cfg.MetricsWhiteList),
