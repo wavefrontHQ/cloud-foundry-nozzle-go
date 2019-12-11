@@ -8,12 +8,22 @@ import (
 
 	"github.com/cloudfoundry/noaa/consumer"
 	noaaerrors "github.com/cloudfoundry/noaa/errors"
+	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gorilla/websocket"
+	"github.com/rcrowley/go-metrics"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
 	wfnozzle "github.com/wavefronthq/cloud-foundry-nozzle-go/nozzle"
+	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
 var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
+
+var (
+	eventsChannel chan *events.Envelope
+	errorsChannel chan error
+	puts          = metrics.NewCounter()
+)
 
 func main() {
 	conf, err := wfnozzle.ParseConfig()
@@ -22,7 +32,17 @@ func main() {
 	}
 	logger.Printf("Forwarding events: %s", conf.Nozzle.SelectedEvents)
 
-	nozzle := wfnozzle.NewNozzle(conf)
+	eventsChannel = make(chan *events.Envelope, conf.Nozzle.ChannelSize)
+	errorsChannel = make(chan error)
+
+	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(queueSize), nozzle.GetInternalTags())
+	reporting.RegisterMetric("nozzle.queue.used", metrics.NewFunctionalGauge(queueUsed), nozzle.GetInternalTags())
+	reporting.RegisterMetric("nozzle.queue.puts", puts, nozzle.GetInternalTags())
+
+	var nozzles []*nozzle.Nozzle
+	for i := 0; i < conf.Nozzle.Workers; i++ {
+		nozzles = append(nozzles, wfnozzle.NewNozzle(conf, eventsChannel, errorsChannel))
+	}
 
 	for {
 		var trafficControllerURL string
@@ -33,7 +53,9 @@ func main() {
 			logger.Fatal("[ERROR] Unable to build API client: ", err)
 		}
 
-		nozzle.APIClient = api
+		for _, nozzle := range nozzles {
+			nozzle.APIClient = api
+		}
 
 		token, err := api.FetchAuthToken()
 		if err != nil {
@@ -56,10 +78,11 @@ func main() {
 			for {
 				select {
 				case event := <-events:
-					nozzle.EventsChannel <- event
+					puts.Inc(1)
+					eventsChannel <- event
 				case err := <-errs:
 					printError(err)
-					nozzle.ErrorsChannel <- err
+					errorsChannel <- err
 					close(done)
 					return
 				}
@@ -70,6 +93,14 @@ func main() {
 		noaaConsumer.Close()
 		logger.Println("Reconnecting")
 	}
+}
+
+func queueSize() int64 {
+	return int64(cap(eventsChannel))
+}
+
+func queueUsed() int64 {
+	return int64(len(eventsChannel))
 }
 
 func printError(err error) {

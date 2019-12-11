@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	metrics "github.com/rcrowley/go-metrics"
@@ -16,6 +17,25 @@ import (
 )
 
 var trace = os.Getenv("WAVEFRONT_TRACE") == "true"
+
+var (
+	internalTags               = GetInternalTags()
+	NumMetricsSent             = newCounter("total-metrics-sent", internalTags)
+	MetricsSendFailure         = newCounter("metrics-send-failure", internalTags)
+	MetricsFiltered            = newCounter("metrics-filtered", internalTags)
+	NumValueMetricReceived     = newCounter("value-metric-received", internalTags)
+	NumCounterEventReceived    = newCounter("counter-event-received", internalTags)
+	NumContainerMetricReceived = newCounter("container-metric-received", internalTags)
+	HandleErrorMetric          = newCounter("firehose-connection-error", internalTags)
+
+	doOnce sync.Once
+)
+
+func init() {
+	doOnce.Do(func() {
+		startHealthReport()
+	})
+}
 
 // EventHandler receive CF events and send metrics to WF
 type EventHandler struct {
@@ -79,32 +99,21 @@ func CreateEventHandler(conf *WavefrontConfig) *EventHandler {
 		reporting.Prefix("wavefront-firehose-nozzle.app"),
 	)
 
-	internalTags := GetInternalTags()
-	logger.Printf("internalTags: %v", internalTags)
-
-	numMetricsSent := newCounter("total-metrics-sent", internalTags)
-	metricsSendFailure := newCounter("metrics-send-failure", internalTags)
-	metricsFiltered := newCounter("metrics-filtered", internalTags)
-	numValueMetricReceived := newCounter("value-metric-received", internalTags)
-	numCounterEventReceived := newCounter("counter-event-received", internalTags)
-	numContainerMetricReceived := newCounter("container-metric-received", internalTags)
-	handleErrorMetric := newCounter("firehose-connection-error", internalTags)
-
 	ev := &EventHandler{
 		sender:                     sender,
 		reporter:                   reporter,
 		prefix:                     strings.Trim(conf.Prefix, " "),
 		foundation:                 strings.Trim(conf.Foundation, " "),
 		filter:                     NewGlobFilter(conf.Filters),
-		numMetricsSent:             numMetricsSent,
-		metricsSendFailure:         metricsSendFailure,
-		metricsFiltered:            metricsFiltered,
-		numValueMetricReceived:     numValueMetricReceived,
-		numCounterEventReceived:    numCounterEventReceived,
-		numContainerMetricReceived: numContainerMetricReceived,
-		handleErrorMetric:          handleErrorMetric,
+		numMetricsSent:             NumMetricsSent,
+		metricsSendFailure:         MetricsSendFailure,
+		metricsFiltered:            MetricsFiltered,
+		numValueMetricReceived:     NumValueMetricReceived,
+		numCounterEventReceived:    NumCounterEventReceived,
+		numContainerMetricReceived: NumContainerMetricReceived,
+		handleErrorMetric:          HandleErrorMetric,
 	}
-	ev.startHealthReport()
+
 	return ev
 }
 
@@ -249,11 +258,11 @@ func (w *EventHandler) ReportError(err error) {
 	w.handleErrorMetric.Inc(1)
 }
 
-func (w *EventHandler) startHealthReport() {
+func startHealthReport() {
 	ticker := time.NewTicker(time.Minute)
 	go func() {
 		for range ticker.C {
-			logger.Printf("total metrics sent: %d  filtered: %d  failures: %d", w.numMetricsSent.Count(), w.metricsFiltered.Count(), w.metricsSendFailure.Count())
+			logger.Printf("--total metrics sent: %d  filtered: %d  failures: %d", NumMetricsSent.Count(), MetricsFiltered.Count(), MetricsSendFailure.Count())
 		}
 	}()
 }

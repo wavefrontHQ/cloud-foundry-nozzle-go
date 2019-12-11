@@ -5,8 +5,6 @@ import (
 	"os"
 
 	"github.com/cloudfoundry/sonde-go/events"
-	metrics "github.com/rcrowley/go-metrics"
-	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
@@ -14,8 +12,8 @@ var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
 
 // Nozzle will read all CF events and sent it to the Forwarder
 type Nozzle struct {
-	EventsChannel chan *events.Envelope
-	ErrorsChannel chan error
+	eventsChannel chan *events.Envelope
+	errorsChannel chan error
 	APIClient     *APIClient
 
 	eventSerializer    *EventHandler
@@ -24,11 +22,11 @@ type Nozzle struct {
 }
 
 // NewNozzle create a new Nozzle
-func NewNozzle(conf *Config) *Nozzle {
+func NewNozzle(conf *Config, eventsChannel chan *events.Envelope, errorsChannel chan error) *Nozzle {
 	nozzle := &Nozzle{
 		eventSerializer: CreateEventHandler(conf.Wavefront),
-		EventsChannel:   make(chan *events.Envelope, 1000),
-		ErrorsChannel:   make(chan error),
+		eventsChannel:   eventsChannel,
+		errorsChannel:   errorsChannel,
 	}
 
 	nozzle.includedEventTypes = map[events.Envelope_EventType]bool{
@@ -43,22 +41,16 @@ func NewNozzle(conf *Config) *Nozzle {
 		nozzle.includedEventTypes[selectedEventType] = true
 	}
 
-	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(nozzle.queueSize), GetInternalTags())
-
 	go nozzle.run()
 	return nozzle
-}
-
-func (s *Nozzle) queueSize() int64 {
-	return int64(len(s.EventsChannel))
 }
 
 func (s *Nozzle) run() {
 	for {
 		select {
-		case event := <-s.EventsChannel:
+		case event := <-s.eventsChannel:
 			s.handleEvent(event)
-		case err := <-s.ErrorsChannel:
+		case err := <-s.errorsChannel:
 			s.eventSerializer.ReportError(err)
 		}
 	}
@@ -76,15 +68,15 @@ func (s *Nozzle) handleEvent(envelope *events.Envelope) {
 	case events.Envelope_CounterEvent:
 		s.eventSerializer.BuildCounterEvent(envelope)
 	case events.Envelope_ContainerMetric:
-		appGuIG := envelope.GetContainerMetric().GetApplicationId()
-		if s.APIClient != nil {
-			appInfo, err := s.APIClient.GetApp(appGuIG)
-			if err != nil && debug {
-				logger.Print("[ERROR]", err)
-			}
-			s.eventSerializer.BuildContainerEvent(envelope, appInfo)
-		} else {
-			logger.Fatal("[ERROR] APIClient is null")
-		}
+		// appGuIG := envelope.GetContainerMetric().GetApplicationId()
+		// if s.APIClient != nil {
+		// 	appInfo, err := s.APIClient.GetApp(appGuIG)
+		// 	if err != nil && debug {
+		// 		logger.Print("[ERROR]", err)
+		// 	}
+		s.eventSerializer.BuildContainerEvent(envelope, nil)
+		// } else {
+		// 	logger.Fatal("[ERROR] APIClient is null")
+		// }
 	}
 }
