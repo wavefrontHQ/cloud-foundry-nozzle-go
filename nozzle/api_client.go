@@ -2,14 +2,15 @@ package nozzle
 
 import (
 	"fmt"
+	"math/rand"
 	"net/url"
 	"strings"
 	"time"
 
-	metrics "github.com/rcrowley/go-metrics"
-
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
 	cache "github.com/patrickmn/go-cache"
+	metrics "github.com/rcrowley/go-metrics"
+	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 // APIClient wrapper for Cloud Foundry Client
@@ -18,6 +19,8 @@ type APIClient struct {
 	client       *cfclient.Client
 	appCache     *cache.Cache
 	appCacheSize int
+	errors       metrics.Counter
+	miss         metrics.Counter
 }
 
 // AppInfo holds Cloud Foundry applications information
@@ -63,12 +66,34 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 		return nil, err
 	}
 
-	return &APIClient{
+	internalTags := GetInternalTags()
+
+	api := &APIClient{
 		clientConfig: config,
 		client:       client,
 		appCache:     cache.New(conf.AppCacheExpiration, time.Hour),
 		appCacheSize: conf.AppCacheSize,
-	}, nil
+		errors:       newCounter("cache.errors", internalTags),
+		miss:         newCounter("cache.miss", internalTags),
+	}
+
+	reporting.RegisterMetric("cache.size", metrics.NewFunctionalGauge(api.cacheSize), internalTags)
+
+	time.Sleep(time.Second * time.Duration(rand.Intn(5)))
+	logger.Println("Loading app info cache")
+	apps := api.listApps()
+	logger.Printf("found %d apps", len(apps))
+
+	for guid, app := range apps {
+		api.appCache.Set(guid, app, 0)
+	}
+	logger.Println("Loading app info cache Done")
+
+	return api, nil
+}
+
+func (api *APIClient) cacheSize() int64 {
+	return int64(api.appCache.ItemCount())
 }
 
 // FetchTrafficControllerURL return Doppler Endpoint URL
@@ -99,52 +124,21 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 
 // GetApp return cached AppInfo for a guid
 func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
-	size := metrics.GetOrRegisterGauge("cache.size", nil)
-	errors := metrics.GetOrRegisterCounter("cache.errors", nil)
-	miss := metrics.GetOrRegisterCounter("cache.miss", nil)
-	size.Update(int64(api.appCache.ItemCount()))
-
 	appInfo, found := api.appCache.Get(guid)
 	if found {
 		return appInfo.(*AppInfo), nil
 	}
 
-	miss.Inc(1)
-
-	if api.appCache.ItemCount() == 0 {
-		for guid, app := range api.listApps() {
-			if api.appCache.ItemCount() < api.appCacheSize {
-				api.appCache.Set(guid, app, 0)
-			} else {
-				errors.Inc(1)
-				if debug {
-					logger.Printf("[WARN] app cache is full")
-				}
-				break
-			}
-		}
-	}
-	appInfo, found = api.appCache.Get(guid)
-	if found {
-		return appInfo.(*AppInfo), nil
-	}
+	api.miss.Inc(1)
 
 	app, err := api.client.AppByGuid(guid)
 	if err != nil {
-		errors.Inc(1)
+		api.errors.Inc(1)
 		return nil, fmt.Errorf("error getting app info: %v", err)
 	}
 
 	appInfo = newAppInfo(app)
-
-	if api.appCache.ItemCount() < api.appCacheSize {
-		api.appCache.Set(guid, newAppInfo(app), 0)
-	} else {
-		errors.Inc(1)
-		if debug {
-			logger.Printf("[WARN] app cache is full")
-		}
-	}
+	api.appCache.Set(guid, newAppInfo(app), 0)
 
 	return appInfo.(*AppInfo), nil
 }
