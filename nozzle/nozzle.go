@@ -70,10 +70,7 @@ func (s *Nozzle) handleEvent(envelope *events.Envelope) {
 	case events.Envelope_ContainerMetric:
 		appGuIG := envelope.GetContainerMetric().GetApplicationId()
 		if s.APIClient != nil {
-			appInfo, err := s.APIClient.GetApp(appGuIG)
-			if err != nil && debug {
-				logger.Print("[ERROR]", err)
-			}
+			appInfo := s.APIClient.GetApp(appGuIG)
 			s.eventSerializer.BuildContainerEvent(envelope, appInfo)
 		} else {
 			logger.Fatal("[ERROR] APIClient is null")

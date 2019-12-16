@@ -1,8 +1,6 @@
 package nozzle
 
 import (
-	"fmt"
-	"math/rand"
 	"net/url"
 	"strings"
 	"time"
@@ -13,14 +11,52 @@ import (
 	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
+var (
+	appCacheExp     = 6 * time.Hour
+	appCache        = cache.New(appCacheExp, time.Hour)
+	appCacheErrors  = newCounter("cache.errors", internalTags)
+	appCacheMiss    = newCounter("cache.miss", internalTags)
+	appCacheChannel = make(chan string, 1000)
+	appCacheAPI     *APIClient
+)
+
+func init() {
+	reporting.RegisterMetric("cache.size", metrics.NewFunctionalGauge(func() int64 { return int64(appCache.ItemCount()) }), internalTags)
+	go func() {
+		init := false
+		for guid := range appCacheChannel {
+			if appCacheAPI != nil {
+				if !init {
+					logger.Println("Loading app info cache")
+					apps := appCacheAPI.listApps()
+					logger.Printf("found %d apps", len(apps))
+					for guid, app := range apps {
+						appCache.Set(guid, app, appCacheExp)
+					}
+					logger.Println("Loading app info cache Done")
+					init = true
+				} else {
+					appCacheMiss.Inc(1)
+					app, err := appCacheAPI.client.AppByGuid(guid)
+					if err != nil {
+						appCacheErrors.Inc(1)
+						logger.Printf("error getting app info: %v", err)
+					} else {
+						appCache.Set(guid, newAppInfo(app), appCacheExp)
+					}
+				}
+			} else {
+				logger.Printf("Api == null")
+			}
+		}
+	}()
+}
+
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
 	clientConfig *cfclient.Config
 	client       *cfclient.Client
-	appCache     *cache.Cache
 	appCacheSize int
-	errors       metrics.Counter
-	miss         metrics.Counter
 }
 
 // AppInfo holds Cloud Foundry applications information
@@ -66,34 +102,15 @@ func NewAPIClient(conf *NozzleConfig) (*APIClient, error) {
 		return nil, err
 	}
 
-	internalTags := GetInternalTags()
-
 	api := &APIClient{
 		clientConfig: config,
 		client:       client,
-		appCache:     cache.New(conf.AppCacheExpiration, time.Hour),
-		appCacheSize: conf.AppCacheSize,
-		errors:       newCounter("cache.errors", internalTags),
-		miss:         newCounter("cache.miss", internalTags),
 	}
 
-	reporting.RegisterMetric("cache.size", metrics.NewFunctionalGauge(api.cacheSize), internalTags)
-
-	time.Sleep(time.Second * time.Duration(rand.Intn(5)))
-	logger.Println("Loading app info cache")
-	apps := api.listApps()
-	logger.Printf("found %d apps", len(apps))
-
-	for guid, app := range apps {
-		api.appCache.Set(guid, app, 0)
-	}
-	logger.Println("Loading app info cache Done")
+	appCacheExp = conf.AppCacheExpiration
+	appCacheAPI = api
 
 	return api, nil
-}
-
-func (api *APIClient) cacheSize() int64 {
-	return int64(api.appCache.ItemCount())
 }
 
 // FetchTrafficControllerURL return Doppler Endpoint URL
@@ -123,24 +140,13 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 }
 
 // GetApp return cached AppInfo for a guid
-func (api *APIClient) GetApp(guid string) (*AppInfo, error) {
-	appInfo, found := api.appCache.Get(guid)
+func (api *APIClient) GetApp(guid string) *AppInfo {
+	appInfo, found := appCache.Get(guid)
 	if found {
-		return appInfo.(*AppInfo), nil
+		return appInfo.(*AppInfo)
 	}
-
-	api.miss.Inc(1)
-
-	app, err := api.client.AppByGuid(guid)
-	if err != nil {
-		api.errors.Inc(1)
-		return nil, fmt.Errorf("error getting app info: %v", err)
-	}
-
-	appInfo = newAppInfo(app)
-	api.appCache.Set(guid, newAppInfo(app), 0)
-
-	return appInfo.(*AppInfo), nil
+	appCacheChannel <- guid
+	return nil
 }
 
 // isValidUrl tests a string to determine if it is a url or not.
