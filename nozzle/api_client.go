@@ -3,6 +3,7 @@ package nozzle
 import (
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
@@ -18,6 +19,7 @@ var (
 	appCacheMiss    = newCounter("cache.miss", internalTags)
 	appCacheChannel = make(chan string, 1000)
 	appCacheAPI     *APIClient
+	appCacheDoOnce  sync.Once
 )
 
 func init() {
@@ -27,14 +29,16 @@ func init() {
 		for guid := range appCacheChannel {
 			if appCacheAPI != nil {
 				if !init {
-					logger.Println("Loading app info cache")
-					apps := appCacheAPI.listApps()
-					logger.Printf("found %d apps", len(apps))
-					for guid, app := range apps {
-						appCache.Set(guid, app, appCacheExp)
-					}
-					logger.Println("Loading app info cache Done")
-					init = true
+					go appCacheDoOnce.Do(func() {
+						logger.Println("Loading app info cache")
+						apps := appCacheAPI.listApps()
+						logger.Printf("found %d apps", len(apps))
+						for guid, app := range apps {
+							appCache.Set(guid, app, appCacheExp)
+						}
+						logger.Println("Loading app info cache Done")
+						init = true
+					})
 				} else {
 					appCacheMiss.Inc(1)
 					app, err := appCacheAPI.client.AppByGuid(guid)
