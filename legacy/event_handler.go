@@ -33,9 +33,9 @@ func CreateEventHandler(conf *config.WavefrontConfig) *EventHandler {
 	internalTags := utils.GetInternalTags()
 	utils.Logger.Printf("internalTags: %v", internalTags)
 
-	numValueMetricReceived := wavefront.NewCounter("value-metric-received", internalTags)
-	numCounterEventReceived := wavefront.NewCounter("counter-event-received", internalTags)
-	numContainerMetricReceived := wavefront.NewCounter("container-metric-received", internalTags)
+	numValueMetricReceived := utils.NewCounter("value-metric-received", internalTags)
+	numCounterEventReceived := utils.NewCounter("counter-event-received", internalTags)
+	numContainerMetricReceived := utils.NewCounter("container-metric-received", internalTags)
 
 	ev := &EventHandler{
 		wf:                         wf,

@@ -10,12 +10,11 @@ import (
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/wavefront"
-	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 // Nozzle will read all CF events and sent it to the Forwarder
 type Nozzle struct {
-	EventsChannel chan *loggregator_v2.Envelope
+	eventsChannel chan *loggregator_v2.Envelope
 
 	prefix     string
 	foundation string
@@ -40,17 +39,17 @@ var translateStrs = map[string]string{
 var trace = os.Getenv("WAVEFRONT_TRACE") == "true"
 
 // NewNozzle create a new Nozzle
-func NewNozzle(conf *config.Config) *Nozzle {
+func NewNozzle(conf *config.Config, eventsChannel chan *loggregator_v2.Envelope) *Nozzle {
 	internalTags := utils.GetInternalTags()
 	utils.Logger.Printf("internalTags: %v", internalTags)
 
-	numGaugeMetricReceived := newCounter("value-metric-received", internalTags)
-	numCounterEventReceived := newCounter("counter-event-received", internalTags)
+	numGaugeMetricReceived := utils.NewCounter("cauge-metric-received", internalTags)
+	numCounterEventReceived := utils.NewCounter("counter-event-received", internalTags)
 
 	nozzle := &Nozzle{
 		wf: wavefront.NewWavefront(conf.Wavefront),
 
-		EventsChannel: make(chan *loggregator_v2.Envelope, 1000),
+		eventsChannel: eventsChannel,
 
 		numGaugeMetricReceived:  numGaugeMetricReceived,
 		numCounterEventReceived: numCounterEventReceived,
@@ -59,14 +58,8 @@ func NewNozzle(conf *config.Config) *Nozzle {
 		foundation: strings.Trim(conf.Wavefront.Foundation, " "),
 	}
 
-	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(nozzle.queueSize), utils.GetInternalTags())
-
 	go nozzle.run()
 	return nozzle
-}
-
-func (nozzle *Nozzle) queueSize() int64 {
-	return int64(len(nozzle.EventsChannel))
 }
 
 func (nozzle *Nozzle) Stop() {
@@ -76,7 +69,7 @@ func (nozzle *Nozzle) Stop() {
 func (nozzle *Nozzle) run() {
 	for {
 		select {
-		case event := <-nozzle.EventsChannel:
+		case event := <-nozzle.eventsChannel:
 			nozzle.handleEvent(event)
 		case <-nozzle.done:
 			return
@@ -184,13 +177,12 @@ func (nozzle *Nozzle) getTags(event *loggregator_v2.Envelope) map[string]string 
 	if nozzle.Api != nil {
 		if event.GetTags()["origin"] == "rep" {
 			if sourceID, ok := event.GetTags()["source_id"]; ok {
-				app, err := nozzle.Api.GetApp(sourceID)
-				if err != nil {
-					utils.Logger.Printf("Error on gettin app name: %v", err)
+				app := nozzle.Api.GetApp(sourceID)
+				if app != nil {
+					tags["applicationName"] = app.Name
+					tags["org"] = app.Org
+					tags["space"] = app.Space
 				}
-				tags["applicationName"] = app.Name
-				tags["org"] = app.Org
-				tags["space"] = app.Space
 			}
 		}
 	}
@@ -203,8 +195,4 @@ func (nozzle *Nozzle) getTags(event *loggregator_v2.Envelope) map[string]string 
 		}
 	}
 	return tags
-}
-
-func newCounter(name string, tags map[string]string) metrics.Counter {
-	return reporting.GetOrRegisterMetric(name, metrics.NewCounter(), tags).(metrics.Counter)
 }

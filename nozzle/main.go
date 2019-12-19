@@ -8,9 +8,11 @@ import (
 
 	loggregator "code.cloudfoundry.org/go-loggregator"
 	"code.cloudfoundry.org/go-loggregator/rpc/loggregator_v2"
+	"github.com/rcrowley/go-metrics"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/api"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
+	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 var allSelectors = []*loggregator_v2.Selector{
@@ -26,8 +28,24 @@ var allSelectors = []*loggregator_v2.Selector{
 	},
 }
 
+var (
+	eventsChannel chan *loggregator_v2.Envelope
+	errorsChannel chan error
+	puts          = metrics.NewCounter()
+)
+
 func Run(conf *config.Config) {
-	wfnozzle := NewNozzle(conf)
+	eventsChannel = make(chan *loggregator_v2.Envelope, conf.Nozzle.ChannelSize)
+	errorsChannel = make(chan error)
+
+	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(queueSize), utils.GetInternalTags())
+	reporting.RegisterMetric("nozzle.queue.used", metrics.NewFunctionalGauge(queueUsed), utils.GetInternalTags())
+	reporting.RegisterMetric("nozzle.queue.puts", puts, utils.GetInternalTags())
+
+	var nozzles []*Nozzle
+	for i := 0; i < conf.Nozzle.Workers; i++ {
+		nozzles = append(nozzles, NewNozzle(conf, eventsChannel))
+	}
 
 	for {
 		utils.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
@@ -36,7 +54,9 @@ func Run(conf *config.Config) {
 			utils.Logger.Fatal("[ERROR] Unable to build API client: ", err)
 		}
 
-		wfnozzle.Api = api
+		for _, nozzle := range nozzles {
+			nozzle.Api = api
+		}
 
 		token, err := api.FetchAuthToken()
 		if err != nil {
@@ -62,7 +82,8 @@ func Run(conf *config.Config) {
 		go func() {
 			for {
 				for _, e := range es() {
-					wfnozzle.EventsChannel <- e
+					puts.Inc(1)
+					eventsChannel <- e
 				}
 				if ctx.Err() != nil {
 					return
@@ -72,6 +93,14 @@ func Run(conf *config.Config) {
 
 		<-ctx.Done()
 	}
+}
+
+func queueSize() int64 {
+	return int64(cap(eventsChannel))
+}
+
+func queueUsed() int64 {
+	return int64(len(eventsChannel))
 }
 
 type tokenAttacher struct {

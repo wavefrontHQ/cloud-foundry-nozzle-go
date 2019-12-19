@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/rcrowley/go-metrics"
+	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 // VCAPApplication holds nozzle app info
@@ -45,6 +48,11 @@ func GetInternalTags() map[string]string {
 		Logger.Printf("[ERROR] %v", err)
 	}
 	return internalTags
+}
+
+// NewCounter creates and register internal metrics
+func NewCounter(name string, tags map[string]string) metrics.Counter {
+	return reporting.GetOrRegisterMetric(name, metrics.NewCounter(), tags).(metrics.Counter)
 }
 
 var Logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)

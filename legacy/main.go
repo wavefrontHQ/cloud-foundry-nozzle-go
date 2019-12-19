@@ -2,41 +2,67 @@ package legacy
 
 import (
 	"crypto/tls"
+	"log"
+	"os"
 	"reflect"
 
 	"github.com/cloudfoundry/noaa/consumer"
 	noaaerrors "github.com/cloudfoundry/noaa/errors"
+	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gorilla/websocket"
+	"github.com/rcrowley/go-metrics"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/api"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
+	"github.com/wavefronthq/go-metrics-wavefront/reporting"
+)
+
+var logger = log.New(os.Stdout, "[WAVEFRONT] ", 0)
+var debug = os.Getenv("WAVEFRONT_DEBUG") == "true"
+
+var (
+	eventsChannel chan *events.Envelope
+	errorsChannel chan error
+	puts          = metrics.NewCounter()
 )
 
 func Run(conf *config.Config) {
-	nozzle := NewNozzle(conf)
+	eventsChannel = make(chan *events.Envelope, conf.Nozzle.ChannelSize)
+	errorsChannel = make(chan error)
+
+	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(queueSize), utils.GetInternalTags())
+	reporting.RegisterMetric("nozzle.queue.used", metrics.NewFunctionalGauge(queueUsed), utils.GetInternalTags())
+	reporting.RegisterMetric("nozzle.queue.puts", puts, utils.GetInternalTags())
+
+	var nozzles []*Nozzle
+	for i := 0; i < conf.Nozzle.Workers; i++ {
+		nozzles = append(nozzles, NewNozzle(conf, eventsChannel, errorsChannel))
+	}
 
 	for {
 		var trafficControllerURL string
-		utils.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
+		logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
 
 		api, err := api.NewAPIClient(conf.Nozzle)
 		if err != nil {
-			utils.Logger.Fatal("[ERROR] Unable to build API client: ", err)
+			logger.Fatal("[ERROR] Unable to build API client: ", err)
 		}
 
-		nozzle.APIClient = api
+		for _, nozzle := range nozzles {
+			nozzle.APIClient = api
+		}
 
 		token, err := api.FetchAuthToken()
 		if err != nil {
-			utils.Logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
+			logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
 		}
 
 		trafficControllerURL = api.FetchTrafficControllerURL()
 		if trafficControllerURL == "" {
-			utils.Logger.Fatal("[ERROR] trafficControllerURL from client was blank")
+			logger.Fatal("[ERROR] trafficControllerURL from client was blank")
 		}
 
-		utils.Logger.Printf("Consuming firehose: %v\n", trafficControllerURL)
+		logger.Printf("Consuming firehose: %v\n", trafficControllerURL)
 		noaaConsumer := consumer.New(trafficControllerURL, &tls.Config{
 			InsecureSkipVerify: conf.Nozzle.SkipSSL,
 		}, nil)
@@ -47,10 +73,11 @@ func Run(conf *config.Config) {
 			for {
 				select {
 				case event := <-events:
-					nozzle.EventsChannel <- event
+					puts.Inc(1)
+					eventsChannel <- event
 				case err := <-errs:
 					printError(err)
-					nozzle.ErrorsChannel <- err
+					errorsChannel <- err
 					close(done)
 					return
 				}
@@ -59,8 +86,16 @@ func Run(conf *config.Config) {
 		<-done
 
 		noaaConsumer.Close()
-		utils.Logger.Println("Reconnecting")
+		logger.Println("Reconnecting")
 	}
+}
+
+func queueSize() int64 {
+	return int64(cap(eventsChannel))
+}
+
+func queueUsed() int64 {
+	return int64(len(eventsChannel))
 }
 
 func printError(err error) {
@@ -70,8 +105,8 @@ func printError(err error) {
 
 	switch closeErr := err.(type) {
 	case *websocket.CloseError:
-		utils.Logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
+		logger.Printf("Error from firehose - code:'%v' - Text:'%v' - %v", closeErr.Code, closeErr.Text, err)
 	default:
-		utils.Logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
+		logger.Printf("Error from firehose - %v (%v)", err, reflect.TypeOf(err))
 	}
 }

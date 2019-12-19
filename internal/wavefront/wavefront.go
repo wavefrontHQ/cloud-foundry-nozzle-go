@@ -74,10 +74,10 @@ func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 	internalTags := utils.GetInternalTags()
 	utils.Logger.Printf("internalTags: %v", internalTags)
 
-	numMetricsSent := NewCounter("total-metrics-sent", internalTags)
-	metricsSendFailure := NewCounter("metrics-send-failure", internalTags)
-	metricsFiltered := NewCounter("metrics-filtered", internalTags)
-	handleErrorMetric := NewCounter("firehose-connection-error", internalTags)
+	numMetricsSent := utils.NewCounter("total-metrics-sent", internalTags)
+	metricsSendFailure := utils.NewCounter("metrics-send-failure", internalTags)
+	metricsFiltered := utils.NewCounter("metrics-filtered", internalTags)
+	handleErrorMetric := utils.NewCounter("firehose-connection-error", internalTags)
 
 	reporter := reporting.NewReporter(
 		sender,
@@ -139,8 +139,4 @@ func (w *wavefront) startHealthReport() {
 //ReportError increments the error counter
 func (w *wavefront) ReportError(err error) {
 	w.handleErrorMetric.Inc(1)
-}
-
-func NewCounter(name string, tags map[string]string) metrics.Counter {
-	return reporting.GetOrRegisterMetric(name, metrics.NewCounter(), tags).(metrics.Counter)
 }
