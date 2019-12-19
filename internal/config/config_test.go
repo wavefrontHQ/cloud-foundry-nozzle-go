@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wavefronthq/cloud-foundry-nozzle-go/common"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/legacy"
 )
 
@@ -27,20 +27,20 @@ func TestTagFilters(t *testing.T) {
 	setUpFooEnv()
 
 	os.Setenv("FILTER_METRICS_TAG_BLACK_LIST", "tag1:[foo1,foo2,foo3],tag2:[foo1,foo2]")
-	config, err := common.ParseConfig()
+	cfg, err := config.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
 
-	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo1"))
-	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo2"))
-	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo3"))
-	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo1"))
-	assert.True(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo2"))
-	assert.False(t, contains(config.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo3"))
+	assert.True(t, contains(cfg.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo1"))
+	assert.True(t, contains(cfg.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo2"))
+	assert.True(t, contains(cfg.Wavefront.Filters.MetricsTagBlackList["tag1"], "foo3"))
+	assert.True(t, contains(cfg.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo1"))
+	assert.True(t, contains(cfg.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo2"))
+	assert.False(t, contains(cfg.Wavefront.Filters.MetricsTagBlackList["tag2"], "foo3"))
 
 	os.Setenv("FILTER_METRICS_TAG_BLACK_LIST", "tag1:foo1,foo2,foo3,tag1:foo1")
-	config, err = common.ParseConfig()
+	cfg, err = config.ParseConfig()
 	if err != nil {
 		log.Print("[OK] Unable to build config from environment: ", err)
 	} else {
@@ -65,7 +65,7 @@ func TestIndexed(t *testing.T) {
 	os.Setenv("FILTER_METRICS_TAG_WHITE_LIST_2", "tag4:foo4")   // ignored
 	os.Setenv("FILTER_METRICS_TAG_WHITE_LIST_fsd", "tag4:foo4") // ignored
 
-	config, err := common.ParseConfig()
+	config, err := config.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -91,7 +91,7 @@ func TestEmptyIndexed(t *testing.T) {
 	os.Clearenv()
 	setUpFooEnv()
 
-	config, err := common.ParseConfig()
+	config, err := config.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -136,7 +136,7 @@ func TestLegacySelector(t *testing.T) {
 	os.Clearenv()
 	setUpFooEnv()
 	os.Setenv("NOZZLE_LEGACY", "true")
-	cfg, err := common.ParseConfig()
+	cfg, err := config.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -144,7 +144,7 @@ func TestLegacySelector(t *testing.T) {
 
 	os.Clearenv()
 	setUpFooEnv()
-	cfg, err = common.ParseConfig()
+	cfg, err = config.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -156,7 +156,7 @@ func TestAdvancedConfig(t *testing.T) {
 	setUpFooEnv()
 	os.Setenv("ADVANCED_CONFIG", `{"value":"yes","selected_option":{"custom_wf_proxy_addr":"addr.es","custom_wf_proxy_port":1234,"filter_metrics_black_list":"Black","filter_metrics_white_list":"White","instances":3,"selected_events":["ValueMetric","ContainerMetric"]}}`)
 
-	cfg, err := common.ParseConfig()
+	cfg, err := config.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
@@ -171,7 +171,7 @@ func TestAdvancedConfig(t *testing.T) {
 	setUpFooEnv()
 	os.Setenv("ADVANCED_CONFIG", `{"value":"no","selected_option":{}}`)
 
-	cfg, err = common.ParseConfig()
+	cfg, err = config.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
