@@ -176,7 +176,11 @@ func (nozzle *Nozzle) getTags(event *loggregator_v2.Envelope) map[string]string 
 
 	if nozzle.Api != nil {
 		if event.GetTags()["origin"] == "rep" {
-			if sourceID, ok := event.GetTags()["source_id"]; ok {
+			if appName, ok := event.GetTags()["app_name"]; ok {
+				tags["applicationName"] = appName
+				tags["org"] = event.GetTags()["organization_name"]
+				tags["space"] = event.GetTags()["space_name"]
+			} else if sourceID, ok := event.GetTags()["source_id"]; ok {
 				app := nozzle.Api.GetApp(sourceID)
 				if app != nil {
 					tags["applicationName"] = app.Name
@@ -194,5 +198,10 @@ func (nozzle *Nozzle) getTags(event *loggregator_v2.Envelope) map[string]string 
 			tags[k] = v
 		}
 	}
+
+	delete(tags, "app_name")
+	delete(tags, "organization_name")
+	delete(tags, "space_name")
+
 	return tags
 }
