@@ -13,7 +13,7 @@ func main() {
 		utils.Logger.Fatal("[ERROR] Unable to build config from environment: ", err)
 	}
 
-	if conf.Nozzle.Legacy {
+	if conf.Nozzle.AdvancedConfig.Values.LegacyMode {
 		utils.Logger.Println("Using deprecated v1 Cloud Foundry API")
 		legacy.Run(conf)
 	} else {

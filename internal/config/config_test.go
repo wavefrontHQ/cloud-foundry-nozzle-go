@@ -135,12 +135,12 @@ func assertPanic(t *testing.T, f func()) {
 func TestLegacySelector(t *testing.T) {
 	os.Clearenv()
 	setUpFooEnv()
-	os.Setenv("NOZZLE_LEGACY", "true")
+	os.Setenv("ADVANCED_CONFIG", `{"value":"yes","selected_option":{"legacy_mode":true}}`)
 	cfg, err := config.ParseConfig()
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
-	assert.True(t, cfg.Nozzle.Legacy)
+	assert.True(t, cfg.Nozzle.AdvancedConfig.Values.LegacyMode)
 
 	os.Clearenv()
 	setUpFooEnv()
@@ -148,7 +148,7 @@ func TestLegacySelector(t *testing.T) {
 	if err != nil {
 		assert.FailNow(t, "[ERROR] Unable to build config from environment: ", err)
 	}
-	assert.False(t, cfg.Nozzle.Legacy)
+	assert.False(t, cfg.Nozzle.AdvancedConfig.Values.LegacyMode)
 }
 
 func TestAdvancedConfig(t *testing.T) {

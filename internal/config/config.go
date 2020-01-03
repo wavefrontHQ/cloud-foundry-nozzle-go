@@ -34,8 +34,6 @@ type NozzleConfig struct {
 
 	AdvancedConfig advancedConfig `envconfig:"ADVANCED_CONFIG"`
 
-	Legacy bool `default:"false" envconfig:"legacy"`
-
 	ChannelSize int `split_words:"true" default:"1000"`
 	Workers     int `split_words:"true" default:"1"`
 }
@@ -62,6 +60,7 @@ type advancedConfig struct {
 		SelectedEvents   []string `json:"selected_events"`
 		MetricsBlackList string   `json:"filter_metrics_black_list"`
 		MetricsWhiteList string   `json:"filter_metrics_white_list"`
+		LegacyMode       bool     `json:"legacy_mode"`
 	} `json:"selected_option"`
 }
 
