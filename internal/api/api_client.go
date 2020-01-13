@@ -4,66 +4,25 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"time"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
-	cache "github.com/patrickmn/go-cache"
-	metrics "github.com/rcrowley/go-metrics"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
-	"github.com/wavefronthq/go-metrics-wavefront/reporting"
 )
 
 var (
-	internalTags    = utils.GetInternalTags()
-	appCacheExp     = 6 * time.Hour
-	appCache        = cache.New(appCacheExp, time.Hour)
-	appCacheErrors  = utils.NewCounter("cache.errors", internalTags)
-	appCacheMiss    = utils.NewCounter("cache.miss", internalTags)
-	appCacheChannel = make(chan string, 1000)
-	appCacheAPI     *APIClient
-	appCacheDoOnce  sync.Once
+	appCacheDoOnce sync.Once
 )
 
 func init() {
-	reporting.RegisterMetric("cache.size", metrics.NewFunctionalGauge(func() int64 { return int64(appCache.ItemCount()) }), internalTags)
-	go func() {
-		init := false
-		for guid := range appCacheChannel {
-			if appCacheAPI != nil {
-				if !init {
-					go appCacheDoOnce.Do(func() {
-						utils.Logger.Println("Loading app info cache")
-						apps := appCacheAPI.listApps()
-						utils.Logger.Printf("found %d apps", len(apps))
-						for guid, app := range apps {
-							appCache.Set(guid, app, appCacheExp)
-						}
-						utils.Logger.Println("Loading app info cache Done")
-						init = true
-					})
-				} else {
-					appCacheMiss.Inc(1)
-					app, err := appCacheAPI.client.AppByGuid(guid)
-					if err != nil {
-						appCacheErrors.Inc(1)
-						utils.Logger.Printf("error getting app info: %v", err)
-					} else {
-						appCache.Set(guid, newAppInfo(app), appCacheExp)
-					}
-				}
-			} else {
-				utils.Logger.Printf("Api == null")
-			}
-		}
-	}()
+
 }
 
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
 	clientConfig *cfclient.Config
 	client       *cfclient.Client
-	appCacheSize int
+	appsCahce    *appsCache
 }
 
 // AppInfo holds Cloud Foundry applications information
@@ -92,30 +51,30 @@ func newAppInfo(app cfclient.App) *AppInfo {
 }
 
 // NewAPIClient crate a new ApiClient
-func NewAPIClient(conf *config.NozzleConfig) (*APIClient, error) {
-	apiURL := strings.Trim(conf.APIURL, " ")
+func NewAPIClient(nozzleConfig *config.NozzleConfig) (*APIClient, error) {
+	apiURL := strings.Trim(nozzleConfig.APIURL, " ")
 	if !isValidURL(apiURL) {
 		apiURL = "https://" + apiURL
 	}
-	config := &cfclient.Config{
+
+	apiConfig := &cfclient.Config{
 		ApiAddress:        apiURL,
-		Username:          conf.Username,
-		Password:          conf.Password,
-		SkipSslValidation: conf.SkipSSL,
+		Username:          nozzleConfig.Username,
+		Password:          nozzleConfig.Password,
+		SkipSslValidation: nozzleConfig.SkipSSL,
 	}
 
-	client, err := cfclient.NewClient(config)
+	client, err := cfclient.NewClient(apiConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	api := &APIClient{
-		clientConfig: config,
+		clientConfig: apiConfig,
 		client:       client,
 	}
 
-	appCacheExp = conf.AppCacheExpiration
-	appCacheAPI = api
+	api.appsCahce = prepareAppsCache(api, nozzleConfig)
 
 	return api, nil
 }
@@ -148,12 +107,7 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 
 // GetApp return cached AppInfo for a guid
 func (api *APIClient) GetApp(guid string) *AppInfo {
-	appInfo, found := appCache.Get(guid)
-	if found {
-		return appInfo.(*AppInfo)
-	}
-	appCacheChannel <- guid
-	return nil
+	return api.appsCahce.getApp(guid)
 }
 
 // isValidUrl tests a string to determine if it is a url or not.
