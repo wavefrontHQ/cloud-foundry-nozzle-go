@@ -1,4 +1,4 @@
-package nozzle
+package config
 
 import (
 	"encoding/json"
@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/filter"
 )
 
 // Config holds users provided env variables
@@ -19,18 +19,23 @@ type Config struct {
 
 // NozzleConfig holds specific PCF env variables
 type NozzleConfig struct {
-	APIURL                 string `required:"true" envconfig:"api_url"`
-	Username               string `required:"true"`
-	Password               string `required:"true"`
+	APIURL       string `required:"true" envconfig:"api_url"`
+	Username     string `required:"true"`
+	Password     string `required:"true"`
+	LogStreamURL string `required:"true" envconfig:"log_stream_url"`
+
 	FirehoseSubscriptionID string `required:"true" envconfig:"firehose_subscription_id"`
 	SkipSSL                bool   `default:"false" envconfig:"skip_ssl"`
 
 	AppCacheExpiration time.Duration `split_words:"true" default:"6h"`
 	AppCacheSize       int           `split_words:"true" default:"50000"`
 
-	SelectedEvents []events.Envelope_EventType `ignored:"true"`
+	SelectedEvents string `required:"flase" envconfig:"selected_events"`
 
 	AdvancedConfig advancedConfig `envconfig:"ADVANCED_CONFIG"`
+
+	ChannelSize int `split_words:"true" default:"1000"`
+	Workers     int `split_words:"true" default:"1"`
 }
 
 // WavefrontConfig holds specific Wavefront env variables
@@ -45,7 +50,7 @@ type WavefrontConfig struct {
 	Prefix        string `required:"true" envconfig:"PREFIX"`
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
 
-	Filters *Filters `ignored:"true"`
+	Filters *filter.Filters `ignored:"true"`
 }
 
 type advancedConfig struct {
@@ -55,6 +60,7 @@ type advancedConfig struct {
 		SelectedEvents   []string `json:"selected_events"`
 		MetricsBlackList string   `json:"filter_metrics_black_list"`
 		MetricsWhiteList string   `json:"filter_metrics_white_list"`
+		LegacyMode       bool     `json:"legacy_mode"`
 	} `json:"selected_option"`
 }
 
@@ -72,17 +78,11 @@ type filtersConfig struct {
 	MetricsBlackList []string `split_words:"true"`
 	MetricsWhiteList []string `split_words:"true"`
 
-	MetricsTagBlackList TagFilter `split_words:"true"`
-	MetricsTagWhiteList TagFilter `split_words:"true"`
+	MetricsTagBlackList filter.TagFilter `split_words:"true"`
+	MetricsTagWhiteList filter.TagFilter `split_words:"true"`
 
 	TagInclude []string `split_words:"true"`
 	TagExclude []string `split_words:"true"`
-}
-
-var defaultEvents = []events.Envelope_EventType{
-	events.Envelope_ValueMetric,
-	events.Envelope_CounterEvent,
-	events.Envelope_ContainerMetric,
 }
 
 // ParseConfig reads users provided env variables and create a Config
@@ -101,11 +101,6 @@ func ParseConfig() (*Config, error) {
 	if len(nozzleConfig.AdvancedConfig.Values.SelectedEvents) > 0 {
 		os.Setenv("NOZZLE_SELECTED_EVENTS", strings.Join(nozzleConfig.AdvancedConfig.Values.SelectedEvents, ","))
 	}
-	selectedEvents, err := ParseSelectedEvents()
-	if err != nil {
-		return nil, err
-	}
-	nozzleConfig.SelectedEvents = selectedEvents
 
 	wavefrontConfig := &WavefrontConfig{}
 	err = envconfig.Process("wavefront", wavefrontConfig)
@@ -130,7 +125,7 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
-	wavefrontConfig.Filters = &Filters{
+	wavefrontConfig.Filters = &filter.Filters{
 		MetricsBlackList:    f.MetricsBlackList,
 		MetricsWhiteList:    f.MetricsWhiteList,
 		MetricsTagBlackList: f.MetricsTagBlackList,
@@ -158,30 +153,4 @@ func parseIndexedVars(varName string) {
 		os.Setenv(varName, newV)
 		idx++
 	}
-}
-
-// ParseSelectedEvents get the Selected Events from the env
-func ParseSelectedEvents() ([]events.Envelope_EventType, error) {
-	orgEnvValue := os.Getenv("NOZZLE_SELECTED_EVENTS")
-	envValue := strings.Trim(orgEnvValue, "[]")
-	if envValue == "" {
-		return defaultEvents, nil
-	}
-
-	selectedEvents := []events.Envelope_EventType{}
-	sep := " "
-	if strings.Contains(envValue, ",") {
-		sep = ","
-	}
-	for _, envValueSplit := range strings.Split(envValue, sep) {
-		envValueSlitTrimmed := strings.TrimSpace(envValueSplit)
-		val, found := events.Envelope_EventType_value[envValueSlitTrimmed]
-		if found {
-			selectedEvents = append(selectedEvents, events.Envelope_EventType(val))
-		} else {
-			return nil, fmt.Errorf("[%s] is not a valid event type", orgEnvValue)
-		}
-	}
-
-	return selectedEvents, nil
 }
