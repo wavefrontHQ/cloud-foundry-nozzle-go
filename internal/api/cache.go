@@ -12,11 +12,12 @@ import (
 )
 
 type appsCache struct {
-	cache   *cache.Cache
-	api     *APIClient
-	errors  metrics.Counter
-	miss    metrics.Counter
-	channel chan string
+	cache      *cache.Cache
+	api        *APIClient
+	errors     metrics.Counter
+	miss       metrics.Counter
+	channel    chan string
+	initDoOnce sync.Once
 }
 
 var prepareCacheDoOnce sync.Once
@@ -43,7 +44,7 @@ func (apps *appsCache) run() {
 		init := false
 		for guid := range apps.channel {
 			if !init {
-				go appCacheDoOnce.Do(func() {
+				go apps.initDoOnce.Do(func() {
 					utils.Logger.Println("Loading apps info cache")
 					appsList := apps.api.listApps()
 					utils.Logger.Printf("Found %d apps", len(appsList))

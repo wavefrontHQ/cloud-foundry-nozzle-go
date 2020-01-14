@@ -3,20 +3,11 @@ package api
 import (
 	"net/url"
 	"strings"
-	"sync"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/config"
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
 )
-
-var (
-	appCacheDoOnce sync.Once
-)
-
-func init() {
-
-}
 
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
