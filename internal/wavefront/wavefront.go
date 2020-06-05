@@ -31,6 +31,7 @@ type wavefront struct {
 	metricsSendFailure metrics.Counter
 	metricsFiltered    metrics.Counter
 	handleErrorMetric  metrics.Counter
+	sentTimeMetric     metrics.Histogram
 }
 
 func NewWavefront(conf *config.WavefrontConfig) Wavefront {
@@ -60,6 +61,7 @@ func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 			Host:                 strings.Trim(conf.ProxyAddr, " "),
 			MetricsPort:          conf.ProxyPort,
 			FlushIntervalSeconds: conf.FlushInterval,
+			DistributionPort:     conf.ProxyPort,
 		}
 		sender, err = senders.NewProxySender(proxyCfg)
 		if err != nil {
@@ -79,6 +81,8 @@ func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 	metricsFiltered := utils.NewCounter("metrics-filtered", internalTags)
 	handleErrorMetric := utils.NewCounter("firehose-connection-error", internalTags)
 
+	sentTimeMetric := reporting.GetOrRegisterMetric("metric-sent-time", reporting.NewHistogram(), internalTags).(metrics.Histogram)
+
 	reporter := reporting.NewReporter(
 		sender,
 		application.New("pcf-nozzle", "internal-metrics"),
@@ -93,6 +97,7 @@ func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 		metricsSendFailure: metricsSendFailure,
 		metricsFiltered:    metricsFiltered,
 		handleErrorMetric:  handleErrorMetric,
+		sentTimeMetric:     sentTimeMetric,
 	}
 	wf.startHealthReport()
 	return wf
@@ -113,7 +118,10 @@ func (w *wavefront) SendMetric(name string, value float64, ts int64, source stri
 	}
 
 	if w.filter.Match(name, tags) {
+		start := time.Now()
 		err := w.sender.SendMetric(name, value, ts, source, tags)
+		w.sentTimeMetric.Update(int64(time.Since(start)))
+
 		if err != nil {
 			w.metricsSendFailure.Inc(1)
 			if utils.Debug {
