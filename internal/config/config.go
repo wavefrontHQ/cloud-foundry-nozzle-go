@@ -34,8 +34,8 @@ type NozzleConfig struct {
 
 	AdvancedConfig advancedConfig `envconfig:"ADVANCED_CONFIG"`
 
-	ChannelSize int `split_words:"true" default:"1000"`
-	Workers     int `split_words:"true" default:"1"`
+	ChannelSize int `split_words:"true" default:"10000"`
+	Workers     int `split_words:"true" default:"2"`
 }
 
 // WavefrontConfig holds specific Wavefront env variables
