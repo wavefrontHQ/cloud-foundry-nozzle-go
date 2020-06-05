@@ -32,6 +32,7 @@ var (
 	eventsChannel chan *loggregator_v2.Envelope
 	errorsChannel chan error
 	puts          = metrics.NewCounter()
+	drops         = metrics.NewCounter()
 )
 
 func Run(conf *config.Config) {
@@ -41,6 +42,7 @@ func Run(conf *config.Config) {
 	reporting.RegisterMetric("nozzle.queue.size", metrics.NewFunctionalGauge(queueSize), utils.GetInternalTags())
 	reporting.RegisterMetric("nozzle.queue.used", metrics.NewFunctionalGauge(queueUsed), utils.GetInternalTags())
 	reporting.RegisterMetric("nozzle.queue.puts", puts, utils.GetInternalTags())
+	reporting.RegisterMetric("nozzle.queue.drops", drops, utils.GetInternalTags())
 
 	var nozzles []*Nozzle
 	for i := 0; i < conf.Nozzle.Workers; i++ {
@@ -82,8 +84,12 @@ func Run(conf *config.Config) {
 		go func() {
 			for {
 				for _, e := range es() {
-					puts.Inc(1)
-					eventsChannel <- e
+					select {
+					case eventsChannel <- e:
+						puts.Inc(1)
+					default:
+						drops.Inc(1)
+					}
 				}
 				if ctx.Err() != nil {
 					return
