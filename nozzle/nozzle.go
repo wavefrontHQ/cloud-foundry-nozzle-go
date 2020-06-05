@@ -43,7 +43,7 @@ func NewNozzle(conf *config.Config, eventsChannel chan *loggregator_v2.Envelope)
 	internalTags := utils.GetInternalTags()
 	utils.Logger.Printf("internalTags: %v", internalTags)
 
-	numGaugeMetricReceived := utils.NewCounter("cauge-metric-received", internalTags)
+	numGaugeMetricReceived := utils.NewCounter("gauge-metric-received", internalTags)
 	numCounterEventReceived := utils.NewCounter("counter-event-received", internalTags)
 
 	nozzle := &Nozzle{
