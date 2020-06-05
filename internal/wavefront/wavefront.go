@@ -81,7 +81,7 @@ func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 	metricsFiltered := utils.NewCounter("metrics-filtered", internalTags)
 	handleErrorMetric := utils.NewCounter("firehose-connection-error", internalTags)
 
-	sentTimeMetric := reporting.GetOrRegisterMetric("metric-sent-time", reporting.NewHistogram(), internalTags).(metrics.Histogram)
+	sentTimeMetric := reporting.GetOrRegisterMetric("metrics-send-time", reporting.NewHistogram(), internalTags).(metrics.Histogram)
 
 	reporter := reporting.NewReporter(
 		sender,
