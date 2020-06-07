@@ -73,6 +73,11 @@ func (apps *appsCache) getApp(guid string) *AppInfo {
 	if found {
 		return appInfo.(*AppInfo)
 	}
-	apps.channel <- guid
+
+	select {
+	case apps.channel <- guid:
+	default:
+	}
+
 	return nil
 }
