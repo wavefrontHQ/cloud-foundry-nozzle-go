@@ -8,7 +8,7 @@ require (
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20200413172050-18981bf12b4b
 	github.com/cloudfoundry-incubator/uaago v0.0.0-20190307164349-8136b7bbe76e
 	github.com/cloudfoundry/noaa v2.1.0+incompatible
-	github.com/cloudfoundry/sonde-go v0.0.0-20200416163440-a42463ba266b
+	github.com/cloudfoundry/sonde-go v0.0.0-20171206171820-b33733203bb4
 	github.com/elazarl/goproxy v0.0.0-20200426045556-49ad98f6dac1 // indirect
 	github.com/elazarl/goproxy/ext v0.0.0-20200426045556-49ad98f6dac1 // indirect
 	github.com/gobwas/glob v0.2.3
