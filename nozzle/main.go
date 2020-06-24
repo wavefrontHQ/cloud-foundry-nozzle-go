@@ -3,7 +3,6 @@ package nozzle
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net/http"
 
 	loggregator "code.cloudfoundry.org/go-loggregator"
@@ -50,7 +49,6 @@ func Run(conf *config.Config) {
 	}
 
 	for {
-		utils.Logger.Printf("Fetching auth token via UAA: %v\n", conf.Nozzle.APIURL)
 		api, err := api.NewAPIClient(conf.Nozzle)
 		if err != nil {
 			utils.Logger.Fatal("[ERROR] Unable to build API client: ", err)
@@ -60,18 +58,13 @@ func Run(conf *config.Config) {
 			nozzle.Api = api
 		}
 
-		token, err := api.FetchAuthToken()
-		if err != nil {
-			utils.Logger.Fatal("[ERROR] Unable to fetch token via API: ", err)
-		}
-
 		ctx, cancel := context.WithCancel(context.Background())
 
 		c := loggregator.NewRLPGatewayClient(
 			conf.Nozzle.LogStreamURL,
 			loggregator.WithRLPGatewayClientLogger(utils.Logger),
 			loggregator.WithRLPGatewayHTTPClient(&tokenAttacher{
-				token:  token,
+				api:    api,
 				cancel: cancel,
 			}),
 		)
@@ -110,7 +103,7 @@ func queueUsed() int64 {
 }
 
 type tokenAttacher struct {
-	token  string
+	api    *api.APIClient
 	cancel context.CancelFunc
 }
 
@@ -121,14 +114,18 @@ func (a *tokenAttacher) Do(req *http.Request) (*http.Response, error) {
 	tr := &http.Transport{TLSClientConfig: config}
 	client := &http.Client{Transport: tr}
 
-	req.Header.Set("Authorization", a.token)
+	utils.Logger.Println("Getting token")
+	token, err := a.api.FetchAuthToken()
+	if err != nil {
+		a.cancel()
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", token)
 
 	res, err := client.Do(req)
-	if err == nil {
-		if res.StatusCode == 404 {
-			a.cancel()
-			return nil, fmt.Errorf("Token expired, reconnecting")
-		}
+	if err != nil {
+		a.cancel()
 	}
 	return res, err
 }
