@@ -114,7 +114,9 @@ func (a *tokenAttacher) Do(req *http.Request) (*http.Response, error) {
 	tr := &http.Transport{TLSClientConfig: config}
 	client := &http.Client{Transport: tr}
 
-	utils.Logger.Println("Getting token")
+	if utils.Debug {
+		utils.Logger.Printf("Getting token")
+	}
 	token, err := a.api.FetchAuthToken()
 	if err != nil {
 		a.cancel()

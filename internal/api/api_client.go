@@ -47,7 +47,6 @@ func NewAPIClient(nozzleConfig *config.NozzleConfig) (*APIClient, error) {
 		apiURL = "https://" + apiURL
 	}
 
-	// TODO: rename Username to ClientID
 	client, err := cfclient.NewClient(&cfclient.Config{
 		ApiAddress:        apiURL,
 		ClientID:          nozzleConfig.Username,
