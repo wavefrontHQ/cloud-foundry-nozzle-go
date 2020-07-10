@@ -11,9 +11,8 @@ import (
 
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
-	clientConfig *cfclient.Config
-	client       *cfclient.Client
-	appsCahce    *appsCache
+	client    *cfclient.Client
+	appsCahce *appsCache
 }
 
 // AppInfo holds Cloud Foundry applications information
@@ -48,21 +47,18 @@ func NewAPIClient(nozzleConfig *config.NozzleConfig) (*APIClient, error) {
 		apiURL = "https://" + apiURL
 	}
 
-	apiConfig := &cfclient.Config{
+	client, err := cfclient.NewClient(&cfclient.Config{
 		ApiAddress:        apiURL,
-		Username:          nozzleConfig.Username,
-		Password:          nozzleConfig.Password,
-		SkipSslValidation: nozzleConfig.SkipSSL,
-	}
-
-	client, err := cfclient.NewClient(apiConfig)
+		ClientID:          nozzleConfig.Username,
+		ClientSecret:      nozzleConfig.Password,
+		SkipSslValidation: true,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	api := &APIClient{
-		clientConfig: apiConfig,
-		client:       client,
+		client: client,
 	}
 
 	api.appsCahce = prepareAppsCache(api, nozzleConfig)
