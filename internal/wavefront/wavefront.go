@@ -24,6 +24,7 @@ type Wavefront interface {
 
 type wavefront struct {
 	sender   senders.Sender
+	hisSender senders.Sender
 	reporter reporting.WavefrontMetricsReporter
 	filter   filter.Filter
 
@@ -35,7 +36,7 @@ type wavefront struct {
 }
 
 func NewWavefront(conf *config.WavefrontConfig) Wavefront {
-	var sender senders.Sender
+	var sender, hisSender senders.Sender
 	var err error
 
 	if len(conf.ProxyAddr) == 0 {
@@ -67,6 +68,17 @@ func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 		if err != nil {
 			utils.Logger.Fatal(err)
 		}
+		utils.Logger.Printf("Connecting to Wavefront proxy: '%s:%d'", conf.ProxyAddr, conf.ProxyHisToMinPort)
+		proxyHisCfg := &senders.ProxyConfiguration{
+			Host:                 strings.Trim(conf.ProxyAddr, " "),
+			MetricsPort:          conf.ProxyHisToMinPort,
+			FlushIntervalSeconds: conf.FlushInterval,
+		}
+		hisSender, err = senders.NewProxySender(proxyHisCfg)
+		if err != nil {
+			utils.Logger.Fatal(err)
+		}
+
 	} else {
 		utils.Logger.Printf("Direct configuration: %s", conf.URL)
 		utils.Logger.Printf("Proxy configuration: '%s:%d'", conf.ProxyAddr, conf.ProxyPort)
@@ -91,6 +103,7 @@ func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 
 	wf := &wavefront{
 		sender:             sender,
+		hisSender:          hisSender,
 		filter:             filter.NewGlobFilter(conf.Filters),
 		reporter:           reporter,
 		numMetricsSent:     numMetricsSent,
@@ -104,6 +117,7 @@ func NewWavefront(conf *config.WavefrontConfig) Wavefront {
 }
 
 func (w *wavefront) SendMetric(name string, value float64, ts int64, source string, tags map[string]string) {
+	var err error
 	if trace {
 		line, err := senders.MetricLine(name, value, ts, source, tags, "")
 		if err != nil {
@@ -119,7 +133,11 @@ func (w *wavefront) SendMetric(name string, value float64, ts int64, source stri
 
 	if w.filter.Match(name, tags) {
 		start := time.Now()
-		err := w.sender.SendMetric(name, value, ts, source, tags)
+		if w.filter.IsHistogramMetric(name){
+			err = w.hisSender.SendMetric(name, value, ts, source, tags)
+		} else {
+			err = w.sender.SendMetric(name, value, ts, source, tags)
+		}
 		w.sentTimeMetric.Update(int64(time.Since(start)))
 
 		if err != nil {

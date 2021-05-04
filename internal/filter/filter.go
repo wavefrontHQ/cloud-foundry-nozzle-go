@@ -12,6 +12,7 @@ import (
 // Filter will compare metrics names and tags against regex
 type Filter interface {
 	Match(name string, tags map[string]string) bool
+	IsHistogramMetric(name string) bool
 }
 
 // TagFilter is used to deifne tag filters
@@ -37,6 +38,7 @@ func (f *TagFilter) Decode(filters string) error {
 type Filters struct {
 	MetricsBlackList []string
 	MetricsWhiteList []string
+	MetricsToHisList  []string
 
 	MetricsTagBlackList TagFilter
 	MetricsTagWhiteList TagFilter
@@ -48,6 +50,7 @@ type Filters struct {
 type globFilter struct {
 	metricWhitelist    glob.Glob
 	metricBlacklist    glob.Glob
+	metricsToHisList    glob.Glob
 	metricTagWhitelist map[string]glob.Glob
 	metricTagBlacklist map[string]glob.Glob
 	tagInclude         glob.Glob
@@ -61,6 +64,7 @@ func NewGlobFilter(cfg *Filters) Filter {
 
 	utils.Logger.Printf("filters: MetricsWhiteList = '%v", cfg.MetricsWhiteList)
 	utils.Logger.Printf("filters: MetricsBlackList = '%v", cfg.MetricsBlackList)
+	utils.Logger.Printf("filters: MetricsToHisList = '%v", cfg.MetricsToHisList)
 	utils.Logger.Printf("filters: MetricsTagWhiteList = '%v", cfg.MetricsTagWhiteList)
 	utils.Logger.Printf("filters: MetricsTagBlackList = '%v", cfg.MetricsTagBlackList)
 	utils.Logger.Printf("filters: TagInclude = '%v", cfg.TagInclude)
@@ -69,6 +73,7 @@ func NewGlobFilter(cfg *Filters) Filter {
 	return &globFilter{
 		metricWhitelist:    compile(cfg.MetricsWhiteList),
 		metricBlacklist:    compile(cfg.MetricsBlackList),
+		metricsToHisList:    compile(cfg.MetricsToHisList),
 		metricTagWhitelist: multiCompile(cfg.MetricsTagWhiteList),
 		metricTagBlacklist: multiCompile(cfg.MetricsTagBlackList),
 		tagInclude:         compile(cfg.TagInclude),
@@ -125,6 +130,13 @@ func (gf *globFilter) Match(name string, tags map[string]string) bool {
 		deleteTags(gf.tagExclude, tags, false)
 	}
 	return true
+}
+
+func (gf *globFilter) IsHistogramMetric(name string) bool {
+	if gf.metricsToHisList != nil && gf.metricsToHisList.Match(name) {
+		return true
+	}
+	return false
 }
 
 func matchesTags(matchers map[string]glob.Glob, tags map[string]string) bool {

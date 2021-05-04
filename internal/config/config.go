@@ -49,6 +49,7 @@ type WavefrontConfig struct {
 	BatchSize     int    `default:"10000" envconfig:"BATCH_SIZE"`
 	Prefix        string `required:"true" envconfig:"PREFIX"`
 	Foundation    string `required:"true" envconfig:"FOUNDATION"`
+	ProxyHisToMinPort int `default:"40001" envconfig:"PROXY_HISTOGRAM_MINUTE_PORT"`
 
 	Filters *filter.Filters `ignored:"true"`
 }
@@ -57,10 +58,12 @@ type advancedConfig struct {
 	Values struct {
 		ProxyAddress     string   `json:"custom_wf_proxy_addr"`
 		ProxyPort        int      `json:"custom_wf_proxy_port"`
+		ProxyHisMinPort  int      `json:"custom_wf_proxy_his_min_port"`
 		SelectedEvents   []string `json:"selected_events"`
 		MetricsBlackList string   `json:"filter_metrics_black_list"`
 		MetricsWhiteList string   `json:"filter_metrics_white_list"`
 		LegacyMode       bool     `json:"legacy_mode"`
+		MetricsToHisList  string  `json:"metrics_to_histogram_filter"`
 	} `json:"selected_option"`
 }
 
@@ -77,6 +80,7 @@ func (ac *advancedConfig) haveCustomProxy() bool {
 type filtersConfig struct {
 	MetricsBlackList []string `split_words:"true"`
 	MetricsWhiteList []string `split_words:"true"`
+	MetricsToHisList  []string `split_words:"true"`
 
 	MetricsTagBlackList filter.TagFilter `split_words:"true"`
 	MetricsTagWhiteList filter.TagFilter `split_words:"true"`
@@ -111,6 +115,7 @@ func ParseConfig() (*Config, error) {
 	if nozzleConfig.AdvancedConfig.haveCustomProxy() {
 		wavefrontConfig.ProxyAddr = nozzleConfig.AdvancedConfig.Values.ProxyAddress
 		wavefrontConfig.ProxyPort = nozzleConfig.AdvancedConfig.Values.ProxyPort
+		wavefrontConfig.ProxyHisToMinPort =  nozzleConfig.AdvancedConfig.Values.ProxyHisMinPort
 	}
 
 	if len(nozzleConfig.AdvancedConfig.Values.MetricsWhiteList) > 0 {
@@ -118,6 +123,9 @@ func ParseConfig() (*Config, error) {
 	}
 	if len(nozzleConfig.AdvancedConfig.Values.MetricsBlackList) > 0 {
 		os.Setenv("FILTER_METRICS_BLACK_LIST", nozzleConfig.AdvancedConfig.Values.MetricsBlackList)
+	}
+	if len(nozzleConfig.AdvancedConfig.Values.MetricsToHisList) > 0 {
+		os.Setenv("FILTER_METRICS_TO_HIS_LIST", nozzleConfig.AdvancedConfig.Values.MetricsToHisList)
 	}
 	f := &filtersConfig{}
 	err = envconfig.Process("filter", f)
@@ -128,6 +136,7 @@ func ParseConfig() (*Config, error) {
 	wavefrontConfig.Filters = &filter.Filters{
 		MetricsBlackList:    f.MetricsBlackList,
 		MetricsWhiteList:    f.MetricsWhiteList,
+		MetricsToHisList:     f.MetricsToHisList,
 		MetricsTagBlackList: f.MetricsTagBlackList,
 		MetricsTagWhiteList: f.MetricsTagWhiteList,
 		TagInclude:          f.TagInclude,
