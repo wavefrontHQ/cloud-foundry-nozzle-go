@@ -23,10 +23,10 @@ type Wavefront interface {
 }
 
 type wavefront struct {
-	sender   senders.Sender
+	sender    senders.Sender
 	hisSender senders.Sender
-	reporter reporting.WavefrontMetricsReporter
-	filter   filter.Filter
+	reporter  reporting.WavefrontMetricsReporter
+	filter    filter.Filter
 
 	numMetricsSent     metrics.Counter
 	metricsSendFailure metrics.Counter
@@ -133,7 +133,7 @@ func (w *wavefront) SendMetric(name string, value float64, ts int64, source stri
 
 	if w.filter.Match(name, tags) {
 		start := time.Now()
-		if w.filter.IsHistogramMetric(name){
+		if w.filter.IsHistogramMetric(name) {
 			err = w.hisSender.SendMetric(name, value, ts, source, tags)
 		} else {
 			err = w.sender.SendMetric(name, value, ts, source, tags)

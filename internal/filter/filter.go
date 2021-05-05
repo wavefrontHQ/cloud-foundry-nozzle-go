@@ -38,7 +38,7 @@ func (f *TagFilter) Decode(filters string) error {
 type Filters struct {
 	MetricsBlackList []string
 	MetricsWhiteList []string
-	MetricsToHisList  []string
+	MetricsToHisList []string
 
 	MetricsTagBlackList TagFilter
 	MetricsTagWhiteList TagFilter
@@ -50,7 +50,7 @@ type Filters struct {
 type globFilter struct {
 	metricWhitelist    glob.Glob
 	metricBlacklist    glob.Glob
-	metricsToHisList    glob.Glob
+	metricsToHisList   glob.Glob
 	metricTagWhitelist map[string]glob.Glob
 	metricTagBlacklist map[string]glob.Glob
 	tagInclude         glob.Glob
@@ -73,7 +73,7 @@ func NewGlobFilter(cfg *Filters) Filter {
 	return &globFilter{
 		metricWhitelist:    compile(cfg.MetricsWhiteList),
 		metricBlacklist:    compile(cfg.MetricsBlackList),
-		metricsToHisList:    compile(cfg.MetricsToHisList),
+		metricsToHisList:   compile(cfg.MetricsToHisList),
 		metricTagWhitelist: multiCompile(cfg.MetricsTagWhiteList),
 		metricTagBlacklist: multiCompile(cfg.MetricsTagBlackList),
 		tagInclude:         compile(cfg.TagInclude),

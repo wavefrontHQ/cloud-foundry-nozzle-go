@@ -40,16 +40,16 @@ type NozzleConfig struct {
 
 // WavefrontConfig holds specific Wavefront env variables
 type WavefrontConfig struct {
-	URL           string `envconfig:"URL"`
-	Token         string `envconfig:"API_TOKEN"`
-	ProxyAddr     string `envconfig:"PROXY_ADDR"`
-	ProxyPort     int    `envconfig:"PROXY_PORT"`
-	FlushInterval int    `default:"5" envconfig:"FLUSH_INTERVAL"`
-	MaxBufferSize int    `default:"100000" envconfig:"MAX_BUFFER_SIZE"`
-	BatchSize     int    `default:"10000" envconfig:"BATCH_SIZE"`
-	Prefix        string `required:"true" envconfig:"PREFIX"`
-	Foundation    string `required:"true" envconfig:"FOUNDATION"`
-	ProxyHisToMinPort int `default:"40001" envconfig:"PROXY_HISTOGRAM_MINUTE_PORT"`
+	URL               string `envconfig:"URL"`
+	Token             string `envconfig:"API_TOKEN"`
+	ProxyAddr         string `envconfig:"PROXY_ADDR"`
+	ProxyPort         int    `envconfig:"PROXY_PORT"`
+	FlushInterval     int    `default:"5" envconfig:"FLUSH_INTERVAL"`
+	MaxBufferSize     int    `default:"100000" envconfig:"MAX_BUFFER_SIZE"`
+	BatchSize         int    `default:"10000" envconfig:"BATCH_SIZE"`
+	Prefix            string `required:"true" envconfig:"PREFIX"`
+	Foundation        string `required:"true" envconfig:"FOUNDATION"`
+	ProxyHisToMinPort int    `default:"40001" envconfig:"PROXY_HISTOGRAM_MINUTE_PORT"`
 
 	Filters *filter.Filters `ignored:"true"`
 }
@@ -63,7 +63,7 @@ type advancedConfig struct {
 		MetricsBlackList string   `json:"filter_metrics_black_list"`
 		MetricsWhiteList string   `json:"filter_metrics_white_list"`
 		LegacyMode       bool     `json:"legacy_mode"`
-		MetricsToHisList  string  `json:"metrics_to_histogram_filter"`
+		MetricsToHisList string   `json:"metrics_to_histogram_filter"`
 	} `json:"selected_option"`
 }
 
@@ -80,7 +80,7 @@ func (ac *advancedConfig) haveCustomProxy() bool {
 type filtersConfig struct {
 	MetricsBlackList []string `split_words:"true"`
 	MetricsWhiteList []string `split_words:"true"`
-	MetricsToHisList  []string `split_words:"true"`
+	MetricsToHisList []string `split_words:"true"`
 
 	MetricsTagBlackList filter.TagFilter `split_words:"true"`
 	MetricsTagWhiteList filter.TagFilter `split_words:"true"`
@@ -115,7 +115,7 @@ func ParseConfig() (*Config, error) {
 	if nozzleConfig.AdvancedConfig.haveCustomProxy() {
 		wavefrontConfig.ProxyAddr = nozzleConfig.AdvancedConfig.Values.ProxyAddress
 		wavefrontConfig.ProxyPort = nozzleConfig.AdvancedConfig.Values.ProxyPort
-		wavefrontConfig.ProxyHisToMinPort =  nozzleConfig.AdvancedConfig.Values.ProxyHisMinPort
+		wavefrontConfig.ProxyHisToMinPort = nozzleConfig.AdvancedConfig.Values.ProxyHisMinPort
 	}
 
 	if len(nozzleConfig.AdvancedConfig.Values.MetricsWhiteList) > 0 {
@@ -136,7 +136,7 @@ func ParseConfig() (*Config, error) {
 	wavefrontConfig.Filters = &filter.Filters{
 		MetricsBlackList:    f.MetricsBlackList,
 		MetricsWhiteList:    f.MetricsWhiteList,
-		MetricsToHisList:     f.MetricsToHisList,
+		MetricsToHisList:    f.MetricsToHisList,
 		MetricsTagBlackList: f.MetricsTagBlackList,
 		MetricsTagWhiteList: f.MetricsTagWhiteList,
 		TagInclude:          f.TagInclude,
