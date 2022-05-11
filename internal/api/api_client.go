@@ -9,6 +9,13 @@ import (
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
 )
 
+
+type Client interface {
+	listApps() map[string] *AppInfo
+	AppByGuid(guid string) (cfclient.App, error)
+	newAppInfo(app cfclient.App) *AppInfo
+}
+
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
 	client    *cfclient.Client
@@ -22,7 +29,7 @@ type AppInfo struct {
 	Org   string
 }
 
-func newAppInfo(app cfclient.App) *AppInfo {
+func (api *APIClient) newAppInfo(app cfclient.App) *AppInfo {
 	space, err := app.Space()
 	if err != nil {
 		if utils.Debug {
@@ -87,7 +94,7 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 		utils.Logger.Fatal("[ERROR] error getting apps info: ", err)
 	}
 	for _, app := range apps {
-		appsInfo[app.Guid] = newAppInfo(app)
+		appsInfo[app.Guid] = api.newAppInfo(app)
 	}
 	return appsInfo
 }
@@ -95,6 +102,10 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 // GetApp return cached AppInfo for a guid
 func (api *APIClient) GetApp(guid string) *AppInfo {
 	return api.appsCahce.getApp(guid)
+}
+
+func (api *APIClient) AppByGuid(guid string) (cfclient.App, error){
+	return api.client.AppByGuid(guid)
 }
 
 // isValidUrl tests a string to determine if it is a url or not.
