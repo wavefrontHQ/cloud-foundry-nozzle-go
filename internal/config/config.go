@@ -27,10 +27,11 @@ type NozzleConfig struct {
 	FirehoseSubscriptionID string `required:"true" envconfig:"firehose_subscription_id"`
 	SkipSSL                bool   `default:"false" envconfig:"skip_ssl"`
 
+	EnableAppCache     bool          `default:"true" envconfig:"enable_app_cache"`
 	AppCacheExpiration time.Duration `split_words:"true" default:"6h"`
 	AppCacheSize       int           `split_words:"true" default:"50000"`
 
-	SelectedEvents string `required:"flase" envconfig:"selected_events"`
+	SelectedEvents string `required:"false" envconfig:"selected_events"`
 
 	AdvancedConfig advancedConfig `envconfig:"ADVANCED_CONFIG"`
 

@@ -9,6 +9,13 @@ import (
 	"github.com/wavefronthq/cloud-foundry-nozzle-go/internal/utils"
 )
 
+type Client interface {
+	ListApps() map[string]*AppInfo
+	AppByGuid(guid string) (cfclient.App, error)
+	NewAppInfo(app cfclient.App) *AppInfo
+	GetApp(guid string) *AppInfo
+}
+
 // APIClient wrapper for Cloud Foundry Client
 type APIClient struct {
 	client    *cfclient.Client
@@ -22,7 +29,7 @@ type AppInfo struct {
 	Org   string
 }
 
-func newAppInfo(app cfclient.App) *AppInfo {
+func (api *APIClient) NewAppInfo(app cfclient.App) *AppInfo {
 	space, err := app.Space()
 	if err != nil {
 		if utils.Debug {
@@ -61,7 +68,12 @@ func NewAPIClient(nozzleConfig *config.NozzleConfig) (*APIClient, error) {
 		client: client,
 	}
 
-	api.appsCahce = prepareAppsCache(api, nozzleConfig)
+	if nozzleConfig.EnableAppCache {
+		utils.Logger.Printf("Enabling App Cache")
+		api.appsCahce = prepareAppsCache(api, nozzleConfig)
+	} else {
+		utils.Logger.Printf("App Cache Disabled")
+	}
 
 	return api, nil
 }
@@ -80,14 +92,14 @@ func (api *APIClient) FetchAuthToken() (string, error) {
 	return token, nil
 }
 
-func (api *APIClient) listApps() map[string]*AppInfo {
+func (api *APIClient) ListApps() map[string]*AppInfo {
 	appsInfo := make(map[string]*AppInfo)
 	apps, err := api.client.ListApps()
 	if err != nil {
 		utils.Logger.Fatal("[ERROR] error getting apps info: ", err)
 	}
 	for _, app := range apps {
-		appsInfo[app.Guid] = newAppInfo(app)
+		appsInfo[app.Guid] = api.NewAppInfo(app)
 	}
 	return appsInfo
 }
@@ -95,6 +107,10 @@ func (api *APIClient) listApps() map[string]*AppInfo {
 // GetApp return cached AppInfo for a guid
 func (api *APIClient) GetApp(guid string) *AppInfo {
 	return api.appsCahce.getApp(guid)
+}
+
+func (api *APIClient) AppByGuid(guid string) (cfclient.App, error) {
+	return api.client.AppByGuid(guid)
 }
 
 // isValidUrl tests a string to determine if it is a url or not.

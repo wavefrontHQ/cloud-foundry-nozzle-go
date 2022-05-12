@@ -24,8 +24,9 @@ type Nozzle struct {
 
 	done chan struct{}
 
-	wf  wavefront.Wavefront
-	Api *api.APIClient
+	wf                  wavefront.Wavefront
+	Api                 api.Client
+	enableAppTagLookups bool
 }
 
 var translateStrs = map[string]string{
@@ -47,9 +48,9 @@ func NewNozzle(conf *config.Config, eventsChannel chan *loggregator_v2.Envelope)
 	numCounterEventReceived := utils.NewCounter("counter-event-received", internalTags)
 
 	nozzle := &Nozzle{
-		wf: wavefront.NewWavefront(conf.Wavefront),
-
-		eventsChannel: eventsChannel,
+		wf:                  wavefront.NewWavefront(conf.Wavefront),
+		enableAppTagLookups: conf.Nozzle.EnableAppCache,
+		eventsChannel:       eventsChannel,
 
 		numGaugeMetricReceived:  numGaugeMetricReceived,
 		numCounterEventReceived: numCounterEventReceived,
@@ -180,7 +181,7 @@ func (nozzle *Nozzle) getTags(event *loggregator_v2.Envelope) map[string]string 
 				tags["applicationName"] = appName
 				tags["org"] = event.GetTags()["organization_name"]
 				tags["space"] = event.GetTags()["space_name"]
-			} else if sourceID, ok := event.GetTags()["source_id"]; ok {
+			} else if sourceID, ok := event.GetTags()["source_id"]; ok && nozzle.enableAppTagLookups {
 				app := nozzle.Api.GetApp(sourceID)
 				if app != nil {
 					tags["applicationName"] = app.Name
