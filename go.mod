@@ -12,7 +12,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20200426045556-49ad98f6dac1 // indirect
 	github.com/elazarl/goproxy/ext v0.0.0-20200426045556-49ad98f6dac1 // indirect
 	github.com/gobwas/glob v0.2.3
-	github.com/gogo/protobuf v1.3.1 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mailru/easyjson v0.7.1 // indirect
